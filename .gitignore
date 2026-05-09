@@ -32,3 +32,6 @@ dist-ssr
 *.sln
 *.sw?
 Thumbs.db
+
+#ignore claude stuff
+.claude
