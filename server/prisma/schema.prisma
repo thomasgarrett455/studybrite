@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model ai_conversations {
+  id                   Int                @id @default(autoincrement())
+  user_id              Int
+  classroom_id         Int?
+  quiz_context_id      Int?
+  note_context_id      Int?
+  flashcard_context_id Int?
+  created_at           DateTime           @default(now()) @db.Timestamp(0)
+  updated_at           DateTime           @default(now()) @db.Timestamp(0)
+  users                users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ai_conversations_ibfk_1")
+  classrooms           classrooms?        @relation(fields: [classroom_id], references: [id], onUpdate: NoAction, map: "ai_conversations_ibfk_2")
+  quiz_headers         quiz_headers?      @relation(fields: [quiz_context_id], references: [id], onUpdate: NoAction, map: "ai_conversations_ibfk_3")
+  note_headers         note_headers?      @relation(fields: [note_context_id], references: [id], onUpdate: NoAction, map: "ai_conversations_ibfk_4")
+  flashcard_headers    flashcard_headers? @relation(fields: [flashcard_context_id], references: [id], onUpdate: NoAction, map: "ai_conversations_ibfk_5")
+  chat_messages        chat_messages[]
+
+  @@index([flashcard_context_id], map: "flashcard_context_id")
+  @@index([classroom_id], map: "idx_conversations_classroom")
+  @@index([user_id, updated_at], map: "idx_conversations_user")
+  @@index([note_context_id], map: "note_context_id")
+  @@index([quiz_context_id], map: "quiz_context_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model chat_messages {
+  id               Int                  @id @default(autoincrement())
+  conversation_id  Int
+  sender           chat_messages_sender
+  message_text     String               @db.LongText
+  model_used       String?              @db.VarChar(100)
+  input_tokens     Int?
+  output_tokens    Int?
+  timestamp        DateTime             @default(now()) @db.Timestamp(0)
+  ai_conversations ai_conversations     @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "chat_messages_ibfk_1")
+
+  @@index([conversation_id, timestamp], map: "idx_chat_conversation_time")
+}
+
+model classroom_members {
+  classroom_id Int
+  user_id      Int
+  role         classroom_members_role @default(student)
+  joined_at    DateTime               @default(now()) @db.Timestamp(0)
+  classrooms   classrooms             @relation(fields: [classroom_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "classroom_members_ibfk_1")
+  users        users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "classroom_members_ibfk_2")
+
+  @@id([classroom_id, user_id])
+  @@index([classroom_id, role], map: "idx_members_role")
+  @@index([user_id], map: "idx_members_user")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model classrooms {
+  id                Int                 @id @default(autoincrement())
+  owner_id          Int
+  name              String              @db.VarChar(255)
+  invite_code       String              @unique(map: "invite_code") @db.VarChar(20)
+  created_at        DateTime            @default(now()) @db.Timestamp(0)
+  archived_at       DateTime?           @db.Timestamp(0)
+  ai_conversations  ai_conversations[]
+  classroom_members classroom_members[]
+  users             users               @relation(fields: [owner_id], references: [id], onUpdate: NoAction, map: "classrooms_ibfk_1")
+  flashcard_headers flashcard_headers[]
+  note_headers      note_headers[]
+  quiz_headers      quiz_headers[]
+
+  @@index([archived_at], map: "idx_classrooms_archived_at")
+  @@index([owner_id], map: "idx_classrooms_owner")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model flashcard_headers {
+  id                                                                          Int                  @id @default(autoincrement())
+  creator_id                                                                  Int
+  classroom_id                                                                Int?
+  current_version_id                                                          Int?
+  parent_header_id                                                            Int?
+  created_at                                                                  DateTime             @default(now()) @db.Timestamp(0)
+  archived_at                                                                 DateTime?            @db.Timestamp(0)
+  ai_conversations                                                            ai_conversations[]
+  flashcard_versions_flashcard_headers_current_version_idToflashcard_versions flashcard_versions?  @relation("flashcard_headers_current_version_idToflashcard_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_flashcard_version")
+  users                                                                       users                @relation(fields: [creator_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_headers_ibfk_1")
+  classrooms                                                                  classrooms?          @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "flashcard_headers_ibfk_2")
+  flashcard_headers                                                           flashcard_headers?   @relation("flashcard_headersToflashcard_headers", fields: [parent_header_id], references: [id], onUpdate: NoAction, map: "flashcard_headers_ibfk_3")
+  other_flashcard_headers                                                     flashcard_headers[]  @relation("flashcard_headersToflashcard_headers")
+  flashcard_versions_flashcard_versions_header_idToflashcard_headers          flashcard_versions[] @relation("flashcard_versions_header_idToflashcard_headers")
+
+  @@index([current_version_id], map: "fk_current_flashcard_version")
+  @@index([classroom_id, archived_at], map: "idx_flashcard_headers_classroom")
+  @@index([creator_id, archived_at], map: "idx_flashcard_headers_creator")
+  @@index([parent_header_id], map: "idx_flashcard_headers_parent")
+}
+
+model flashcard_study_progress {
+  id               Int        @id @default(autoincrement())
+  user_id          Int
+  flashcard_id     Int
+  ease_factor      Decimal    @default(2.50) @db.Decimal(4, 2)
+  interval_days    Int        @default(0)
+  repetitions      Int        @default(0)
+  last_reviewed_at DateTime?  @db.Timestamp(0)
+  next_review_at   DateTime?  @db.Timestamp(0)
+  users            users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_study_progress_ibfk_1")
+  flashcards       flashcards @relation(fields: [flashcard_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_study_progress_ibfk_2")
+
+  @@unique([user_id, flashcard_id], map: "uk_progress_user_card")
+  @@index([flashcard_id], map: "flashcard_id")
+  @@index([user_id, next_review_at], map: "idx_progress_due")
+}
+
+model flashcard_versions {
+  id                                                                         Int                 @id @default(autoincrement())
+  header_id                                                                  Int
+  version_number                                                             Int                 @default(1)
+  topic                                                                      String?             @db.VarChar(255)
+  created_at                                                                 DateTime            @default(now()) @db.Timestamp(0)
+  flashcard_headers_flashcard_headers_current_version_idToflashcard_versions flashcard_headers[] @relation("flashcard_headers_current_version_idToflashcard_versions")
+  flashcard_headers_flashcard_versions_header_idToflashcard_headers          flashcard_headers   @relation("flashcard_versions_header_idToflashcard_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_versions_ibfk_1")
+  flashcards                                                                 flashcards[]
+
+  @@unique([header_id, version_number], map: "uk_flashcard_version")
+}
+
+model flashcards {
+  id                       Int                        @id @default(autoincrement())
+  version_id               Int
+  term                     String                     @db.Text
+  definition               String                     @db.Text
+  display_order            Int                        @default(0)
+  flashcard_study_progress flashcard_study_progress[]
+  flashcard_versions       flashcard_versions         @relation(fields: [version_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcards_ibfk_1")
+
+  @@index([version_id, display_order], map: "idx_flashcards_version")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model note_headers {
+  id                                                           Int                @id @default(autoincrement())
+  user_id                                                      Int
+  classroom_id                                                 Int?
+  current_version_id                                           Int?
+  is_ai_generated                                              Boolean            @default(false)
+  created_at                                                   DateTime           @default(now()) @db.Timestamp(0)
+  updated_at                                                   DateTime           @default(now()) @db.Timestamp(0)
+  archived_at                                                  DateTime?          @db.Timestamp(0)
+  ai_conversations                                             ai_conversations[]
+  note_versions_note_headers_current_version_idTonote_versions note_versions?     @relation("note_headers_current_version_idTonote_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_note_version")
+  users                                                        users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_headers_ibfk_1")
+  classrooms                                                   classrooms?        @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "note_headers_ibfk_2")
+  note_versions_note_versions_header_idTonote_headers          note_versions[]    @relation("note_versions_header_idTonote_headers")
+
+  @@index([current_version_id], map: "fk_current_note_version")
+  @@index([classroom_id, archived_at], map: "idx_notes_classroom")
+  @@index([user_id, classroom_id, archived_at], map: "idx_notes_user_classroom")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model note_images {
+  id            Int           @id @default(autoincrement())
+  version_id    Int
+  image_url     String        @db.VarChar(500)
+  display_order Int           @default(0)
+  ocr_text      String?       @db.LongText
+  created_at    DateTime      @default(now()) @db.Timestamp(0)
+  note_versions note_versions @relation(fields: [version_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_images_ibfk_1")
+
+  @@index([version_id, display_order], map: "idx_note_images_version")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model note_versions {
+  id                                                          Int            @id @default(autoincrement())
+  header_id                                                   Int
+  version_number                                              Int            @default(1)
+  title                                                       String?        @db.VarChar(255)
+  content                                                     String?        @db.LongText
+  transcribed_text                                            String?        @db.LongText
+  created_at                                                  DateTime       @default(now()) @db.Timestamp(0)
+  note_headers_note_headers_current_version_idTonote_versions note_headers[] @relation("note_headers_current_version_idTonote_versions")
+  note_images                                                 note_images[]
+  note_headers_note_versions_header_idTonote_headers          note_headers   @relation("note_versions_header_idTonote_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_versions_ibfk_1")
+
+  @@unique([header_id, version_number], map: "uk_note_version")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quiz_attempts {
+  id             Int              @id @default(autoincrement())
+  user_id        Int
+  version_id     Int
+  started_at     DateTime         @default(now()) @db.Timestamp(0)
+  submitted_at   DateTime?        @db.Timestamp(0)
+  score_correct  Int?
+  score_total    Int?
+  users          users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_attempts_ibfk_1")
+  quiz_versions  quiz_versions    @relation(fields: [version_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_attempts_ibfk_2")
+  quiz_responses quiz_responses[]
+
+  @@index([user_id, submitted_at], map: "idx_attempts_user")
+  @@index([version_id], map: "idx_attempts_version")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quiz_headers {
+  id                                                           Int                @id @default(autoincrement())
+  creator_id                                                   Int
+  classroom_id                                                 Int?
+  current_version_id                                           Int?
+  created_at                                                   DateTime           @default(now()) @db.Timestamp(0)
+  archived_at                                                  DateTime?          @db.Timestamp(0)
+  ai_conversations                                             ai_conversations[]
+  quiz_versions_quiz_headers_current_version_idToquiz_versions quiz_versions?     @relation("quiz_headers_current_version_idToquiz_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_quiz_version")
+  users                                                        users              @relation(fields: [creator_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_headers_ibfk_1")
+  classrooms                                                   classrooms?        @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "quiz_headers_ibfk_2")
+  quiz_versions_quiz_versions_header_idToquiz_headers          quiz_versions[]    @relation("quiz_versions_header_idToquiz_headers")
+
+  @@index([current_version_id], map: "fk_current_quiz_version")
+  @@index([classroom_id, archived_at], map: "idx_quiz_headers_classroom")
+  @@index([creator_id, archived_at], map: "idx_quiz_headers_creator")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quiz_questions {
+  id             Int              @id @default(autoincrement())
+  version_id     Int
+  question_text  String           @db.Text
+  answer_data    Json
+  display_order  Int              @default(0)
+  quiz_versions  quiz_versions    @relation(fields: [version_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_questions_ibfk_1")
+  quiz_responses quiz_responses[]
+
+  @@index([version_id, display_order], map: "idx_quiz_questions_version")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model quiz_responses {
+  id             Int            @id @default(autoincrement())
+  attempt_id     Int
+  question_id    Int
+  response_data  Json
+  is_correct     Boolean?
+  answered_at    DateTime       @default(now()) @db.Timestamp(0)
+  quiz_attempts  quiz_attempts  @relation(fields: [attempt_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_responses_ibfk_1")
+  quiz_questions quiz_questions @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_responses_ibfk_2")
+
+  @@unique([attempt_id, question_id], map: "uk_response_per_question")
+  @@index([question_id], map: "question_id")
+}
+
+model quiz_versions {
+  id                                                          Int              @id @default(autoincrement())
+  header_id                                                   Int
+  version_number                                              Int              @default(1)
+  title                                                       String           @db.VarChar(255)
+  topic                                                       String?          @db.VarChar(255)
+  created_at                                                  DateTime         @default(now()) @db.Timestamp(0)
+  quiz_attempts                                               quiz_attempts[]
+  quiz_headers_quiz_headers_current_version_idToquiz_versions quiz_headers[]   @relation("quiz_headers_current_version_idToquiz_versions")
+  quiz_questions                                              quiz_questions[]
+  quiz_headers_quiz_versions_header_idToquiz_headers          quiz_headers     @relation("quiz_versions_header_idToquiz_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_versions_ibfk_1")
+
+  @@unique([header_id, version_number], map: "uk_quiz_version")
+}
+
+model users {
+  id                       Int                        @id @default(autoincrement())
+  name                     String                     @db.VarChar(255)
+  email                    String                     @unique(map: "email") @db.VarChar(255)
+  password_hash            String                     @db.VarChar(255)
+  role                     users_role                 @default(student)
+  created_at               DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at               DateTime                   @default(now()) @db.Timestamp(0)
+  deleted_at               DateTime?                  @db.Timestamp(0)
+  ai_conversations         ai_conversations[]
+  classroom_members        classroom_members[]
+  classrooms               classrooms[]
+  flashcard_headers        flashcard_headers[]
+  flashcard_study_progress flashcard_study_progress[]
+  note_headers             note_headers[]
+  quiz_attempts            quiz_attempts[]
+  quiz_headers             quiz_headers[]
+
+  @@index([deleted_at], map: "idx_users_deleted_at")
+  @@index([email, deleted_at], map: "idx_users_email_active")
+}
+
+enum chat_messages_sender {
+  user
+  ai
+}
+
+enum classroom_members_role {
+  teacher
+  assistant
+  student
+}
+
+enum users_role {
+  student
+  teacher
+  admin
+}
