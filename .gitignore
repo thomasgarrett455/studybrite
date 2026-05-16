@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .vite/
+generated/
 
 # TypeScript
 *.tsbuildinfo

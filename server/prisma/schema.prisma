@@ -79,20 +79,20 @@ model classrooms {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model flashcard_headers {
-  id                                                                          Int                  @id @default(autoincrement())
-  creator_id                                                                  Int
-  classroom_id                                                                Int?
-  current_version_id                                                          Int?
-  parent_header_id                                                            Int?
-  created_at                                                                  DateTime             @default(now()) @db.Timestamp(0)
-  archived_at                                                                 DateTime?            @db.Timestamp(0)
-  ai_conversations                                                            ai_conversations[]
-  flashcard_versions_flashcard_headers_current_version_idToflashcard_versions flashcard_versions?  @relation("flashcard_headers_current_version_idToflashcard_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_flashcard_version")
-  users                                                                       users                @relation(fields: [creator_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_headers_ibfk_1")
-  classrooms                                                                  classrooms?          @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "flashcard_headers_ibfk_2")
-  flashcard_headers                                                           flashcard_headers?   @relation("flashcard_headersToflashcard_headers", fields: [parent_header_id], references: [id], onUpdate: NoAction, map: "flashcard_headers_ibfk_3")
-  other_flashcard_headers                                                     flashcard_headers[]  @relation("flashcard_headersToflashcard_headers")
-  flashcard_versions_flashcard_versions_header_idToflashcard_headers          flashcard_versions[] @relation("flashcard_versions_header_idToflashcard_headers")
+  id                 Int                  @id @default(autoincrement())
+  creator_id         Int
+  classroom_id       Int?
+  current_version_id Int?
+  parent_header_id   Int?
+  created_at         DateTime             @default(now()) @db.Timestamp(0)
+  archived_at        DateTime?            @db.Timestamp(0)
+  ai_conversations   ai_conversations[]
+  currentVersion     flashcard_versions?  @relation("flashcard_headers_current_version_idToflashcard_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_flashcard_version")
+  users              users                @relation(fields: [creator_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_headers_ibfk_1")
+  classrooms         classrooms?          @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "flashcard_headers_ibfk_2")
+  parent             flashcard_headers?   @relation("flashcard_headersToflashcard_headers", fields: [parent_header_id], references: [id], onUpdate: NoAction, map: "flashcard_headers_ibfk_3")
+  children           flashcard_headers[]  @relation("flashcard_headersToflashcard_headers")
+  versions           flashcard_versions[] @relation("flashcard_versions_header_idToflashcard_headers")
 
   @@index([current_version_id], map: "fk_current_flashcard_version")
   @@index([classroom_id, archived_at], map: "idx_flashcard_headers_classroom")
@@ -118,14 +118,14 @@ model flashcard_study_progress {
 }
 
 model flashcard_versions {
-  id                                                                         Int                 @id @default(autoincrement())
-  header_id                                                                  Int
-  version_number                                                             Int                 @default(1)
-  topic                                                                      String?             @db.VarChar(255)
-  created_at                                                                 DateTime            @default(now()) @db.Timestamp(0)
-  flashcard_headers_flashcard_headers_current_version_idToflashcard_versions flashcard_headers[] @relation("flashcard_headers_current_version_idToflashcard_versions")
-  flashcard_headers_flashcard_versions_header_idToflashcard_headers          flashcard_headers   @relation("flashcard_versions_header_idToflashcard_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_versions_ibfk_1")
-  flashcards                                                                 flashcards[]
+  id                Int                 @id @default(autoincrement())
+  header_id         Int
+  version_number    Int                 @default(1)
+  topic             String?             @db.VarChar(255)
+  created_at        DateTime            @default(now()) @db.Timestamp(0)
+  currentForHeaders flashcard_headers[] @relation("flashcard_headers_current_version_idToflashcard_versions")
+  header            flashcard_headers   @relation("flashcard_versions_header_idToflashcard_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "flashcard_versions_ibfk_1")
+  flashcards        flashcards[]
 
   @@unique([header_id, version_number], map: "uk_flashcard_version")
 }
@@ -144,19 +144,19 @@ model flashcards {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model note_headers {
-  id                                                           Int                @id @default(autoincrement())
-  user_id                                                      Int
-  classroom_id                                                 Int?
-  current_version_id                                           Int?
-  is_ai_generated                                              Boolean            @default(false)
-  created_at                                                   DateTime           @default(now()) @db.Timestamp(0)
-  updated_at                                                   DateTime           @default(now()) @db.Timestamp(0)
-  archived_at                                                  DateTime?          @db.Timestamp(0)
-  ai_conversations                                             ai_conversations[]
-  note_versions_note_headers_current_version_idTonote_versions note_versions?     @relation("note_headers_current_version_idTonote_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_note_version")
-  users                                                        users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_headers_ibfk_1")
-  classrooms                                                   classrooms?        @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "note_headers_ibfk_2")
-  note_versions_note_versions_header_idTonote_headers          note_versions[]    @relation("note_versions_header_idTonote_headers")
+  id                 Int                @id @default(autoincrement())
+  user_id            Int
+  classroom_id       Int?
+  current_version_id Int?
+  is_ai_generated    Boolean            @default(false)
+  created_at         DateTime           @default(now()) @db.Timestamp(0)
+  updated_at         DateTime           @default(now()) @db.Timestamp(0)
+  archived_at        DateTime?          @db.Timestamp(0)
+  ai_conversations   ai_conversations[]
+  currentVersion     note_versions?     @relation("note_headers_current_version_idTonote_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_note_version")
+  users              users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_headers_ibfk_1")
+  classrooms         classrooms?        @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "note_headers_ibfk_2")
+  versions           note_versions[]    @relation("note_versions_header_idTonote_headers")
 
   @@index([current_version_id], map: "fk_current_note_version")
   @@index([classroom_id, archived_at], map: "idx_notes_classroom")
@@ -178,21 +178,20 @@ model note_images {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model note_versions {
-  id                                                          Int            @id @default(autoincrement())
-  header_id                                                   Int
-  version_number                                              Int            @default(1)
-  title                                                       String?        @db.VarChar(255)
-  content                                                     String?        @db.LongText
-  transcribed_text                                            String?        @db.LongText
-  created_at                                                  DateTime       @default(now()) @db.Timestamp(0)
-  note_headers_note_headers_current_version_idTonote_versions note_headers[] @relation("note_headers_current_version_idTonote_versions")
-  note_images                                                 note_images[]
-  note_headers_note_versions_header_idTonote_headers          note_headers   @relation("note_versions_header_idTonote_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_versions_ibfk_1")
+  id                Int            @id @default(autoincrement())
+  header_id         Int
+  version_number    Int            @default(1)
+  title             String?        @db.VarChar(255)
+  content           String?        @db.LongText
+  transcribed_text  String?        @db.LongText
+  created_at        DateTime       @default(now()) @db.Timestamp(0)
+  currentForHeaders note_headers[] @relation("note_headers_current_version_idTonote_versions")
+  note_images       note_images[]
+  header            note_headers   @relation("note_versions_header_idTonote_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "note_versions_ibfk_1")
 
   @@unique([header_id, version_number], map: "uk_note_version")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model quiz_attempts {
   id             Int              @id @default(autoincrement())
@@ -212,17 +211,17 @@ model quiz_attempts {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model quiz_headers {
-  id                                                           Int                @id @default(autoincrement())
-  creator_id                                                   Int
-  classroom_id                                                 Int?
-  current_version_id                                           Int?
-  created_at                                                   DateTime           @default(now()) @db.Timestamp(0)
-  archived_at                                                  DateTime?          @db.Timestamp(0)
-  ai_conversations                                             ai_conversations[]
-  quiz_versions_quiz_headers_current_version_idToquiz_versions quiz_versions?     @relation("quiz_headers_current_version_idToquiz_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_quiz_version")
-  users                                                        users              @relation(fields: [creator_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_headers_ibfk_1")
-  classrooms                                                   classrooms?        @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "quiz_headers_ibfk_2")
-  quiz_versions_quiz_versions_header_idToquiz_headers          quiz_versions[]    @relation("quiz_versions_header_idToquiz_headers")
+  id                 Int                @id @default(autoincrement())
+  creator_id         Int
+  classroom_id       Int?
+  current_version_id Int?
+  created_at         DateTime           @default(now()) @db.Timestamp(0)
+  archived_at        DateTime?          @db.Timestamp(0)
+  ai_conversations   ai_conversations[]
+  currentVersion     quiz_versions?     @relation("quiz_headers_current_version_idToquiz_versions", fields: [current_version_id], references: [id], onUpdate: NoAction, map: "fk_current_quiz_version")
+  users              users              @relation(fields: [creator_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_headers_ibfk_1")
+  classrooms         classrooms?        @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "quiz_headers_ibfk_2")
+  versions           quiz_versions[]    @relation("quiz_versions_header_idToquiz_headers")
 
   @@index([current_version_id], map: "fk_current_quiz_version")
   @@index([classroom_id, archived_at], map: "idx_quiz_headers_classroom")
@@ -258,16 +257,16 @@ model quiz_responses {
 }
 
 model quiz_versions {
-  id                                                          Int              @id @default(autoincrement())
-  header_id                                                   Int
-  version_number                                              Int              @default(1)
-  title                                                       String           @db.VarChar(255)
-  topic                                                       String?          @db.VarChar(255)
-  created_at                                                  DateTime         @default(now()) @db.Timestamp(0)
-  quiz_attempts                                               quiz_attempts[]
-  quiz_headers_quiz_headers_current_version_idToquiz_versions quiz_headers[]   @relation("quiz_headers_current_version_idToquiz_versions")
-  quiz_questions                                              quiz_questions[]
-  quiz_headers_quiz_versions_header_idToquiz_headers          quiz_headers     @relation("quiz_versions_header_idToquiz_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_versions_ibfk_1")
+  id                Int              @id @default(autoincrement())
+  header_id         Int
+  version_number    Int              @default(1)
+  title             String           @db.VarChar(255)
+  topic             String?          @db.VarChar(255)
+  created_at        DateTime         @default(now()) @db.Timestamp(0)
+  quiz_attempts     quiz_attempts[]
+  currentForHeaders quiz_headers[]   @relation("quiz_headers_current_version_idToquiz_versions")
+  quiz_questions    quiz_questions[]
+  header            quiz_headers     @relation("quiz_versions_header_idToquiz_headers", fields: [header_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "quiz_versions_ibfk_1")
 
   @@unique([header_id, version_number], map: "uk_quiz_version")
 }
