@@ -8,7 +8,7 @@ const embed = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY! });
 
 async function main() {
-    const question = "Who is bilbo baggins";
+    const question = "Who is King Noah";
     const response = await embed.embeddings.create({
       model: "text-embedding-3-small",
       input: question
