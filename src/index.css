@@ -1,113 +1,82 @@
 @import "tailwindcss";
 
+/* Semantic design tokens — swap these to retheme the whole app */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --bg:        #171614;
+  --text:      #9a8873;
+  --text-h:    #c9b89f;
+  --border:    #37423d;
+  --accent:    #754043;
+  --accent-bg: #3a2618;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+@theme inline {
+  /* Semantic mappings → Tailwind utilities: bg-canvas, text-ink, border-line, etc. */
+  --color-canvas:      var(--bg);
+  --color-ink:         var(--text);
+  --color-ink-strong:  var(--text-h);
+  --color-line:        var(--border);
+  --color-accent:      var(--accent);
+  --color-accent-soft: var(--accent-bg);
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+  /* Full palette scales → bg-onyx-500, text-bitter-chocolate-200, etc. */
+  --color-onyx-50:  #f3f3f1;
+  --color-onyx-100: #e7e6e4;
+  --color-onyx-200: #d0cdc8;
+  --color-onyx-300: #b8b4ad;
+  --color-onyx-400: #a09b92;
+  --color-onyx-500: #888277;
+  --color-onyx-600: #6d685f;
+  --color-onyx-700: #524e47;
+  --color-onyx-800: #37342f;
+  --color-onyx-900: #1b1a18;
+  --color-onyx-950: #131211;
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
+  --color-dark-coffee-50:  #f7f1ed;
+  --color-dark-coffee-100: #f0e4db;
+  --color-dark-coffee-200: #e1c9b7;
+  --color-dark-coffee-300: #d2ad93;
+  --color-dark-coffee-400: #c3926f;
+  --color-dark-coffee-500: #b4774b;
+  --color-dark-coffee-600: #905f3c;
+  --color-dark-coffee-700: #6c472d;
+  --color-dark-coffee-800: #48301e;
+  --color-dark-coffee-900: #24180f;
+  --color-dark-coffee-950: #19110b;
 
-body {
-  margin: 0;
-}
+  --color-bitter-chocolate-50:  #f6efef;
+  --color-bitter-chocolate-100: #eddedf;
+  --color-bitter-chocolate-200: #dbbdbf;
+  --color-bitter-chocolate-300: #c99c9f;
+  --color-bitter-chocolate-400: #b77b7e;
+  --color-bitter-chocolate-500: #a45b5e;
+  --color-bitter-chocolate-600: #84484b;
+  --color-bitter-chocolate-700: #633639;
+  --color-bitter-chocolate-800: #422426;
+  --color-bitter-chocolate-900: #211213;
+  --color-bitter-chocolate-950: #170d0d;
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
+  --color-dusty-taupe-50:  #f4f2f0;
+  --color-dusty-taupe-100: #eae6e1;
+  --color-dusty-taupe-200: #d4cdc4;
+  --color-dusty-taupe-300: #bfb3a6;
+  --color-dusty-taupe-400: #a99a89;
+  --color-dusty-taupe-500: #94816b;
+  --color-dusty-taupe-600: #766756;
+  --color-dusty-taupe-700: #594d40;
+  --color-dusty-taupe-800: #3b342b;
+  --color-dusty-taupe-900: #1e1a15;
+  --color-dusty-taupe-950: #15120f;
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  --color-charcoal-brown-50:  #f1f3f2;
+  --color-charcoal-brown-100: #e3e8e6;
+  --color-charcoal-brown-200: #c7d1cc;
+  --color-charcoal-brown-300: #acb9b3;
+  --color-charcoal-brown-400: #90a29a;
+  --color-charcoal-brown-500: #748b81;
+  --color-charcoal-brown-600: #5d6f67;
+  --color-charcoal-brown-700: #46534d;
+  --color-charcoal-brown-800: #2e3833;
+  --color-charcoal-brown-900: #171c1a;
+  --color-charcoal-brown-950: #101312;
 }
