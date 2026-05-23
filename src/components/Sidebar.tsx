@@ -5,11 +5,11 @@ export default function Sidebar() {
         <div className="flex-1" />
           <span className="text-ink-strong font-semibold">StudyBrite</span>
           <div className="flex-[2.5] flex justify-end">
-          <button className="hover:text-ink-strong pr-2">⚙</button>
+          <button className="hover:text-ink-strong pr-2 cursor-pointer">⚙</button>
           </div>
         </div>
       <div className="h-full">
-        <button className="w-full flex items-center gap-2 px-2 py-1 hover:bg-accent-soft hover:text-ink-strong">
+        <button className="w-full flex items-center gap-2 px-2 py-1 hover:bg-accent-soft hover:text-ink-strong rounded cursor-pointer">
           <span>+</span>New chat
           </button>
         <details className="group">
