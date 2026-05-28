@@ -21,7 +21,7 @@ const messages: Message[] = [
 ]
 
 export default function ChatArea() {
-  const hasMessages = false //false messages.length >0
+  const hasMessages =  messages.length >0 //false messages.length >0
 
   return (
     <div className="flex flex-col h-full">
