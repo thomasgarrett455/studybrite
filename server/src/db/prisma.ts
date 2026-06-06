@@ -10,6 +10,7 @@ if (!DB_HOST || !DB_USER || !DB) {
 const adapter = new PrismaMariaDb({
   host: config.DB_HOST,
   user: config.DB_USER,
+  password: config.DB_PASSWORD,
   database: config.DB,
 });
 
