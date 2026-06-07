@@ -1,19 +1,19 @@
-import { useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
-import ChatArea from "./components/ChatArea";
+import { clearAuth } from "./lib/api";
 
-export default function HomePage() {
+// Persistent app frame: sidebar + a main panel that swaps via <Outlet />.
+export default function AppShell() {
   const navigate = useNavigate();
 
   function handleLogout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearAuth();
     navigate("/login", { replace: true });
   }
 
   return (
     <div className="flex h-screen bg-canvas text-ink">
-      <aside className="w-48 border-r border-line">
+      <aside className="w-60 border-r border-line shrink-0">
         <Sidebar />
       </aside>
 
@@ -40,7 +40,7 @@ export default function HomePage() {
         </header>
 
         <div className="grow min-h-0">
-          <ChatArea />
+          <Outlet />
         </div>
       </main>
     </div>

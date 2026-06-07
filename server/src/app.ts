@@ -5,6 +5,7 @@ import healthRouter from "./routes/health.routes.js";
 import errorHandler from "./middleware/errorHandler.js"
 import notFoundHandler from './middleware/notFound.js';
 import authRouter from './routes/auth.routes.js';
+import classroomRouter from './routes/classroom.routes.js';
 
 dotenv.config();
 const app = express()
@@ -14,6 +15,8 @@ app.use(express.json());
 app.use('/api/health', healthRouter)
 
 app.use('/api/auth', authRouter)
+
+app.use('/api/classrooms', classroomRouter)
 
 app.use(notFoundHandler)
 app.use(errorHandler)
