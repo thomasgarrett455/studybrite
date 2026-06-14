@@ -46,10 +46,12 @@ export class ApiError extends Error {
 // Wrapper around fetch that adds JSON + Bearer auth headers and parses the body.
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
+  // For FormData, let the browser set Content-Type (with the multipart boundary).
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(path, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
@@ -81,5 +83,52 @@ export function createClassroom(name: string): Promise<{ classroom: Classroom }>
   return apiFetch("/api/classrooms", {
     method: "POST",
     body: JSON.stringify({ name }),
+  });
+}
+
+export type Material = {
+  id: number;
+  created_at: string;
+  currentVersion: { title: string };
+};
+
+export function getMaterials(classroomId: number): Promise<{ materials: Material[] }> {
+  return apiFetch(`/api/classrooms/${classroomId}/materials`);
+}
+
+export function uploadMaterial(
+  classroomId: number,
+  file: File
+): Promise<{ material: { id: number; title: string; chunks: number } }> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch(`/api/classrooms/${classroomId}/materials`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+// Exactly one of these describes where the answer came from.
+export type ChatSourceKind = "materials" | "training" | "web" | "off_topic";
+
+// A web citation — only present when source === "web".
+export type ChatCitation = { url: string; title: string };
+
+export type ChatResponse = {
+  conversationId: number;
+  answer: string;
+  source: ChatSourceKind;
+  sources: ChatCitation[];
+  topScore: number;
+};
+
+export function sendChat(
+  classroomId: number,
+  question: string,
+  conversationId?: number
+): Promise<ChatResponse> {
+  return apiFetch(`/api/classrooms/${classroomId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ question, conversationId }),
   });
 }

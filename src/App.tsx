@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import AppShell from "./AppShell";
-import ChatArea from "./components/ChatArea";
+import Home from "./components/Home";
 import ClassroomView from "./components/ClassroomView";
 import Login from "./Login";
 import Signup from "./Signup";
@@ -20,8 +20,8 @@ export default function App() {
           </RequireAuth>
         }
       >
-        {/* Home / command surface — the chat lives here. */}
-        <Route index element={<ChatArea />} />
+        {/* Home — chat is classroom-scoped, so the index just points into a classroom. */}
+        <Route index element={<Home />} />
         <Route path="classrooms/:id" element={<ClassroomView />} />
       </Route>
     </Routes>
