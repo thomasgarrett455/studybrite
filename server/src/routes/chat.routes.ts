@@ -18,7 +18,7 @@ router.use(requireAuth);
 function ownClassroom(userId: number, classroomId: number) {
     return prisma.classrooms.findFirst({
         where: { id: classroomId, owner_id: userId, archived_at: null },
-        select: { id: true, name: true },
+        select: { id: true, name: true, syllabus_text: true },
     });
 }
 
@@ -134,7 +134,7 @@ router.post("/:id/chat", async (req, res) => {
 
     const chunks = await retrievedChunks({ question, classroomId });
     const fromMaterials = hasCoverage(chunks);
-    const context = formatContext(chunks);
+    const context = formatContext(chunks, classroom.syllabus_text ?? undefined);
 
     let source: "materials" | "training" | "web" | "off_topic";
     let sources: { url: string; title: string }[] = [];
