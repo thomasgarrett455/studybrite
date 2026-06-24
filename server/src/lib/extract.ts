@@ -38,12 +38,33 @@ async function extractPdf(input: ExtractInput): Promise<string> {
   return result.text;
 }
 
+async function extractDocx(input: ExtractInput): Promise<string> {
+  const mammoth = await import("mammoth")
+  const result = await mammoth.extractRawText({ buffer: input.buffer })
+  return result.value;
+}
+
 export async function extractText(input: ExtractInput): Promise<string> {
-  const { mimetype, filename } = input
+  const { mimetype, filename } = input;
+  const name = filename.toLowerCase();
+
   if (mimetype.startsWith("image/")) return extractImage(input)
-  if (mimetype === "application/pdf" || filename.toLowerCase().endsWith(".pdf")) {
+
+  if (mimetype === "application/pdf" || name.endsWith(".pdf")) {
     return extractPdf(input)
   }
 
-  return input.buffer.toString("utf-8"); 
+  if (
+    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    name.endsWith(".docx")
+  ) {
+    return extractDocx(input);
+  }
+
+  // Only decode formats that really ARE plain text — never binary.
+  if (mimetype.startsWith("text/") || name.endsWith(".txt") || name.endsWith(".md")) {
+    return input.buffer.toString("utf-8");
+  }
+
+  return ""; 
 }

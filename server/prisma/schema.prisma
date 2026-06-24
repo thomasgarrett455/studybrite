@@ -66,6 +66,8 @@ model classrooms {
   invite_code       String              @unique(map: "invite_code") @db.VarChar(20)
   created_at        DateTime            @default(now()) @db.Timestamp(0)
   archived_at       DateTime?           @db.Timestamp(0)
+  syllabus_text     String?             @db.LongText
+  syllabus_filename String?             @db.VarChar(255)
   ai_conversations  ai_conversations[]
   classroom_members classroom_members[]
   users             users               @relation(fields: [owner_id], references: [id], onUpdate: NoAction, map: "classrooms_ibfk_1")
