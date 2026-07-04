@@ -11,16 +11,10 @@ import {
   buildOutsideMaterialSystem,
   buildRelevanceSystem,
 } from "../lib/prompt.js";
+import { ownClassroom } from "../lib/classrooms.js";
 
 const router = Router();
 router.use(requireAuth);
-
-function ownClassroom(userId: number, classroomId: number) {
-    return prisma.classrooms.findFirst({
-        where: { id: classroomId, owner_id: userId, archived_at: null },
-        select: { id: true, name: true, syllabus_text: true },
-    });
-}
 
 function extractAnswer(content: Anthropic.ContentBlock[]): string {
     return content

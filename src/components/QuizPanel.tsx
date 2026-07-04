@@ -3,7 +3,7 @@ import {
   listQuizzes,
   generateQuiz,
   startAttempt,
-  ApiError,
+  messageFor,
   type QuizSummary,
   type AttemptQuestion,
 } from "../lib/api";
@@ -279,9 +279,4 @@ function ScoreRing({ correct, total }: { correct: number; total: number }) {
       </div>
     </div>
   );
-}
-
-function messageFor(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  return "Something went wrong. Please try again.";
 }

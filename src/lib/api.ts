@@ -43,6 +43,13 @@ export class ApiError extends Error {
   }
 }
 
+// Turn any caught error into a user-facing string: the API's message when we have
+// one, a generic fallback otherwise. One copy so every screen phrases errors alike.
+export function messageFor(err: unknown): string {
+  if (err instanceof ApiError) return err.message;
+  return "Something went wrong. Please try again.";
+}
+
 // Wrapper around fetch that adds JSON + Bearer auth headers and parses the body.
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();

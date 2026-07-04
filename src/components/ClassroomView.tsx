@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getMaterials, uploadMaterial, uploadSyllabus, ApiError, type Material } from "../lib/api";
+import { getMaterials, uploadMaterial, uploadSyllabus, messageFor, type Material } from "../lib/api";
 import ChatArea from "./ChatArea";
 import QuizPanel from "./QuizPanel";
 
@@ -173,9 +173,4 @@ export default function ClassroomView() {
       </div>
     </div>
   );
-}
-
-function messageFor(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  return "Something went wrong. Please try again.";
 }

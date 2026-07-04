@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import ChatInput from "./ChatInput"
-import { sendChat, ApiError, type ChatSourceKind, type ChatCitation } from "../lib/api"
+import { sendChat, messageFor, type ChatSourceKind, type ChatCitation } from "../lib/api"
 
 type Message =
   | { role: "user"; content: string }
@@ -46,7 +46,7 @@ export default function ChatArea({ classroomId }: Props) {
         { role: "assistant", content: res.answer, source: res.source, sources: res.sources },
       ])
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.")
+      setError(messageFor(err))
     } finally {
       setSending(false)
     }

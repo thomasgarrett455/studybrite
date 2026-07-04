@@ -5,15 +5,34 @@ import requireAuth from "../middleware/requireAuth.js";
 import { anthropic, CHAT_MODEL } from "../lib/anthropic.js";
 import { retrievedChunks } from "../lib/retrieve.js";
 import { formatContext, buildQuizSystem, QUIZ_TOOL, type GeneratedQuestion } from "../lib/prompt.js";
+import { ownClassroom } from "../lib/classrooms.js";
 
 const router = Router();
 router.use(requireAuth);
 
-function ownClassroom(userId: number, classroomId: number) {
-    return prisma.classrooms.findFirst({
-        where: { id: classroomId, owner_id: userId, archived_at: null },
-        select: { id: true, name: true, syllabus_text: true },
+// Thrown inside the submit transaction when another request already claimed the
+// attempt, so we can roll back and answer 409 without a second set of responses.
+class AttemptAlreadySubmitted extends Error {}
+
+// The stored shape of quiz_questions.answer_data (Prisma Json). One place so the
+// take/submit/review casts don't each invent their own partial shape.
+type AnswerData = {
+    options: string[];
+    correct_index: number;
+    explanation: string;
+    source: "materials" | "general";
+};
+
+// URLs reference the quiz HEADER id; every take/submit/review endpoint needs its
+// current version. Resolve it (and the title) once here, returning null when the
+// quiz doesn't exist in this classroom so the caller can 404.
+async function resolveCurrentVersion(quizId: number, classroomId: number) {
+    const header = await prisma.quiz_headers.findFirst({
+        where: { id: quizId, classroom_id: classroomId, archived_at: null },
+        select: { current_version_id: true, currentVersion: { select: { title: true } } },
     });
+    if (!header || !header.current_version_id) return null;
+    return { versionId: header.current_version_id, title: header.currentVersion?.title ?? null };
 }
 
 router.post("/:id/quizzes", async (req, res) => {
@@ -40,10 +59,15 @@ router.post("/:id/quizzes", async (req, res) => {
     
     const chunks = await retrievedChunks({ question: topic, classroomId });
     const context = formatContext(chunks, classroom.syllabus_text ?? undefined);
-    
+
+    // Size the output budget to the quiz length so a large quiz's tool JSON isn't
+    // truncated mid-array (which drops questions or fails parsing). Sonnet 4.6
+    // allows far more; this keeps the request non-streaming and well under limits.
+    const maxTokens = Math.min(8192, 1024 + count * 350);
+
     const ai = await anthropic.messages.create({
         model: CHAT_MODEL,
-        max_tokens: 4096,
+        max_tokens: maxTokens,
         system: buildQuizSystem(context, count),
         tools: [QUIZ_TOOL],
         tool_choice: { type: "tool", name: "emit_quiz" },
@@ -71,44 +95,52 @@ router.post("/:id/quizzes", async (req, res) => {
         q.options.length === 4 &&
         Number.isInteger(q.correct_index) &&
         q.correct_index >= 0 &&
-        q.correct_index <= 3
+        q.correct_index <= 3 &&
+        typeof q.explanation === "string" &&
+        (q.source === "materials" || q.source === "general")
     );
     
         if (valid.length === 0) {
         return res.status(502).json({ message: "Quiz generation returned no valid questions" });
     }
 
-    const header = await prisma.quiz_headers.create({
-        data: { creator_id: userId, classroom_id: classroomId },
-    });
+    // One transaction: either the header, its v1, the current-version pointer, and
+    // all questions all commit, or none do — never a listable quiz with 0 questions.
+    const created = await prisma.$transaction(async (tx) => {
+        const header = await tx.quiz_headers.create({
+            data: { creator_id: userId, classroom_id: classroomId },
+        });
 
-    const version = await prisma.quiz_versions.create({
-        data: { header_id: header.id, version_number: 1, title: `Quiz: ${topic}`, topic },
-    });
+        const version = await tx.quiz_versions.create({
+            data: { header_id: header.id, version_number: 1, title: `Quiz: ${topic}`, topic },
+        });
 
-    await prisma.quiz_headers.update({
-        where: { id: header.id },
-        data: { current_version_id: version.id },
-    });
+        await tx.quiz_headers.update({
+            where: { id: header.id },
+            data: { current_version_id: version.id },
+        });
 
-    await prisma.quiz_questions.createMany({
-        data: valid.map((q, i) => ({
-            version_id: version.id,
-            question_text: q.question_text,
-            answer_data: {
-                options: q.options,
-                correct_index: q.correct_index,
-                explanation: q.explanation,
-                source: q.source,
-            },
-            display_order: i,
-        })),
+        await tx.quiz_questions.createMany({
+            data: valid.map((q, i) => ({
+                version_id: version.id,
+                question_text: q.question_text,
+                answer_data: {
+                    options: q.options,
+                    correct_index: q.correct_index,
+                    explanation: q.explanation,
+                    source: q.source,
+                },
+                display_order: i,
+            })),
+        });
+
+        return { headerId: header.id, versionId: version.id, title: version.title };
     });
 
     return res.json({
-        quizId: header.id,
-        versionId: version.id,
-        title: version.title,
+        quizId: created.headerId,
+        versionId: created.versionId,
+        title: created.title,
         questionCount: valid.length,
     });
 });  // <-- this closes the router.post handler
@@ -161,15 +193,11 @@ router.post("/:id/quizzes/:quizId/attempts", async (req, res) => {
         return res.status(404).json({ message: "Classroom not found" });
     }
 
-    // URLs reference the header id; resolve its current version server-side.
-    const header = await prisma.quiz_headers.findFirst({
-        where: { id: quizId, classroom_id: classroomId, archived_at: null },
-        select: { current_version_id: true, currentVersion: { select: { title: true } } },
-    });
-    if (!header || !header.current_version_id) {
+    const quiz = await resolveCurrentVersion(quizId, classroomId);
+    if (!quiz) {
         return res.status(404).json({ message: "Quiz not found" });
     }
-    const versionId = header.current_version_id;
+    const versionId = quiz.versionId;
 
     const questions = await prisma.quiz_questions.findMany({
         where: { version_id: versionId },
@@ -181,7 +209,7 @@ router.post("/:id/quizzes/:quizId/attempts", async (req, res) => {
     const safe = questions.map((q) => ({
         id: q.id,
         question_text: q.question_text,
-        options: (q.answer_data as { options: string[] }).options,
+        options: (q.answer_data as AnswerData).options,
     }));
 
     const attempt = await prisma.quiz_attempts.create({
@@ -190,7 +218,7 @@ router.post("/:id/quizzes/:quizId/attempts", async (req, res) => {
 
     return res.json({
         attemptId: attempt.id,
-        title: header.currentVersion?.title,
+        title: quiz.title,
         questions: safe,
     });
 });
@@ -211,15 +239,11 @@ router.post("/:id/quizzes/:quizId/attempts/:attemptId/submit", async (req, res) 
         return res.status(404).json({ message: "Classroom not found" });
     }
 
-    // Resolve the quiz's current version from the header id.
-    const header = await prisma.quiz_headers.findFirst({
-        where: { id: quizId, classroom_id: classroomId, archived_at: null },
-        select: { current_version_id: true },
-    });
-    if (!header || !header.current_version_id) {
+    const quiz = await resolveCurrentVersion(quizId, classroomId);
+    if (!quiz) {
         return res.status(404).json({ message: "Quiz not found" });
     }
-    const versionId = header.current_version_id;
+    const versionId = quiz.versionId;
 
     // The attempt must belong to this user and to this quiz's version.
     const attempt = await prisma.quiz_attempts.findFirst({
@@ -252,7 +276,7 @@ router.post("/:id/quizzes/:quizId/attempts/:attemptId/submit", async (req, res) 
     // Unanswered questions stay incorrect with a null selection.
     let scoreCorrect = 0;
     const responses = questions.map((q) => {
-        const correctIndex = (q.answer_data as { correct_index: number }).correct_index;
+        const correctIndex = (q.answer_data as AnswerData).correct_index;
         const selected = picked.has(q.id) ? picked.get(q.id)! : null;
         const isCorrect = selected === correctIndex;
         if (isCorrect) scoreCorrect++;
@@ -265,11 +289,26 @@ router.post("/:id/quizzes/:quizId/attempts/:attemptId/submit", async (req, res) 
     });
     const scoreTotal = questions.length;
 
-    await prisma.quiz_responses.createMany({ data: responses });
-    await prisma.quiz_attempts.update({
-        where: { id: attemptId },
-        data: { submitted_at: new Date(), score_correct: scoreCorrect, score_total: scoreTotal },
-    });
+    // Claim-then-write atomically. The updateMany only matches while submitted_at
+    // is still null, so exactly one of two racing submits flips it and reaches
+    // createMany — the other matches 0 rows and 409s, never inserting a second set
+    // of responses. Wrapped in a transaction so a failed response-write rolls the
+    // claim back (never a submitted attempt with no responses).
+    try {
+        await prisma.$transaction(async (tx) => {
+            const claimed = await tx.quiz_attempts.updateMany({
+                where: { id: attemptId, version_id: versionId, submitted_at: null },
+                data: { submitted_at: new Date(), score_correct: scoreCorrect, score_total: scoreTotal },
+            });
+            if (claimed.count === 0) throw new AttemptAlreadySubmitted();
+            await tx.quiz_responses.createMany({ data: responses });
+        });
+    } catch (err) {
+        if (err instanceof AttemptAlreadySubmitted) {
+            return res.status(409).json({ message: "Attempt already submitted" });
+        }
+        throw err;
+    }
 
     return res.json({ attemptId, scoreCorrect, scoreTotal });
 });
@@ -290,14 +329,11 @@ router.get("/:id/quizzes/:quizId/attempts/:attemptId/review", async (req, res) =
         return res.status(404).json({ message: "Classroom not found" });
     }
 
-    const header = await prisma.quiz_headers.findFirst({
-        where: { id: quizId, classroom_id: classroomId, archived_at: null },
-        select: { current_version_id: true, currentVersion: { select: { title: true } } },
-    });
-    if (!header || !header.current_version_id) {
+    const quiz = await resolveCurrentVersion(quizId, classroomId);
+    if (!quiz) {
         return res.status(404).json({ message: "Quiz not found" });
     }
-    const versionId = header.current_version_id;
+    const versionId = quiz.versionId;
 
     const attempt = await prisma.quiz_attempts.findFirst({
         where: { id: attemptId, user_id: userId, version_id: versionId },
@@ -324,12 +360,7 @@ router.get("/:id/quizzes/:quizId/attempts/:attemptId/review", async (req, res) =
     const byQuestion = new Map(responses.map((r) => [r.question_id, r]));
 
     const review = questions.map((q) => {
-        const a = q.answer_data as {
-            options: string[];
-            correct_index: number;
-            explanation: string;
-            source: string;
-        };
+        const a = q.answer_data as AnswerData;
         const r = byQuestion.get(q.id);
         const selectedIndex = (r?.response_data as { selectedIndex: number | null } | undefined)?.selectedIndex ?? null;
         return {
@@ -346,7 +377,7 @@ router.get("/:id/quizzes/:quizId/attempts/:attemptId/review", async (req, res) =
 
     return res.json({
         attemptId,
-        title: header.currentVersion?.title,
+        title: quiz.title,
         scoreCorrect: attempt.score_correct,
         scoreTotal: attempt.score_total,
         questions: review,

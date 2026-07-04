@@ -7,9 +7,9 @@ export interface GeneratedQuestion {
   question_text: string,
   options: string[],
   correct_index: 0 | 1 | 2 | 3,
-  explanation: string, 
-  source: "materials" | "general" | "web"
-  
+  explanation: string,
+  source: "materials" | "general"
+
 }
 export const QUIZ_TOOL: Anthropic.Tool = {
   name: "emit_quiz",
@@ -26,7 +26,7 @@ export const QUIZ_TOOL: Anthropic.Tool = {
             options:       { type: "array", items: { type: "string" } },
             correct_index: { type: "integer", minimum: 0, maximum: 3 },
             explanation: {type: "string"},
-            source: {type: "string", enum: ["materials", "general", "web"] }
+            source: {type: "string", enum: ["materials", "general"] }
           },
           required: ["question_text", "options", "correct_index", "explanation", "source"],
         },
@@ -113,10 +113,10 @@ export function buildQuizSystem(context: string, count: number): string {
 return [
   "You are an expert quiz generator.",
   `Your only job is to create quizzes with ${count} amount of questions.`,
-  "Each question you generate should come from context, if you think that there is insufficient context you may use General Knowledge, and if General Knowledge is also insufficient, only then can you use a web search.",
+  "Base each question on the provided context. If the context is insufficient for a good question, you may use your own general knowledge instead.",
   "Each question will have 4 answer choices attached and you will need to send the index of the correct answer.",
   "Each question should also come with a 1-2 sentence explanation.",
-  "Each question should have a source tag of where you got that question from.",
+  "Tag each question's source: \"materials\" if it came from the provided context, or \"general\" if it came from your general knowledge.",
   "Keep questions answerable and unambiguous, no trick questions.",
   "Materials:", context
 ].join("\n");

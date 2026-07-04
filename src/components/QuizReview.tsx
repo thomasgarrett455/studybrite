@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   getAttemptReview,
-  ApiError,
+  messageFor,
   type AttemptReview,
   type ReviewQuestion,
   type QuizSourceTier,
@@ -34,11 +34,7 @@ export default function QuizReview({ classroomId, quizId, attemptId, onBack }: P
     let active = true;
     getAttemptReview(classroomId, quizId, attemptId)
       .then((res) => active && setReview(res))
-      .catch(
-        (err) =>
-          active &&
-          setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.")
-      );
+      .catch((err) => active && setError(messageFor(err)));
     return () => {
       active = false;
     };

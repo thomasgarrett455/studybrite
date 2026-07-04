@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { submitAttempt, ApiError, type AttemptQuestion } from "../lib/api";
+import { submitAttempt, messageFor, type AttemptQuestion } from "../lib/api";
 
 type Props = {
   classroomId: number;
@@ -52,7 +52,7 @@ export default function QuizTaker({
       const res = await submitAttempt(classroomId, quizId, attemptId, payload);
       onSubmitted({ scoreCorrect: res.scoreCorrect, scoreTotal: res.scoreTotal });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      setError(messageFor(err));
       setSubmitting(false); // only on failure — on success this component unmounts
     }
   }
