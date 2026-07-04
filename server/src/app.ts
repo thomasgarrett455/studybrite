@@ -8,6 +8,7 @@ import authRouter from './routes/auth.routes.js';
 import classroomRouter from './routes/classroom.routes.js';
 import materialRouter from './routes/material.routes.js';
 import chatRouter from './routes/chat.routes.js';
+import quizRouter from './routes/quiz.routes.js';
 
 
 dotenv.config();
@@ -24,6 +25,8 @@ app.use('/api/classrooms', classroomRouter)
 app.use('/api/classrooms', materialRouter)
 
 app.use('/api/classrooms', chatRouter)
+
+app.use('/api/classrooms', quizRouter);
 
 app.use(notFoundHandler)
 app.use(errorHandler)

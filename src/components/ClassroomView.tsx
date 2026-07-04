@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getMaterials, uploadMaterial, ApiError, type Material } from "../lib/api";
+import { getMaterials, uploadMaterial, uploadSyllabus, ApiError, type Material } from "../lib/api";
 import ChatArea from "./ChatArea";
+import QuizPanel from "./QuizPanel";
+
+// Study modes available inside a classroom. Quiz is M3; Cards/Plan/Teach slot in here later.
+type Mode = "chat" | "quiz";
+const MODES: { id: Mode; label: string }[] = [
+  { id: "chat", label: "Chat" },
+  { id: "quiz", label: "Quiz" },
+];
 
 // A single classroom: a materials panel on the left (upload + ingested files)
 // and the classroom-scoped study chat on the right.
@@ -9,11 +17,14 @@ export default function ClassroomView() {
   const { id } = useParams();
   const classroomId = Number(id);
 
+  const [mode, setMode] = useState<Mode>("chat");
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [syllabusUploading, setSyllabusUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const syllabusInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -44,17 +55,51 @@ export default function ClassroomView() {
     }
   }
 
+  async function handleSyllabusFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSyllabusUploading(true);
+    setError(null);
+    try {
+      await uploadSyllabus(classroomId, file);
+    } catch (err) {
+      setError(messageFor(err));
+    } finally {
+      setSyllabusUploading(false);
+      if (syllabusInput.current) syllabusInput.current.value = ""; // allow re-uploading the same file
+    }
+  }
+
   return (
     <div className="h-full flex min-h-0">
       {/* Materials panel */}
       <section className="w-80 shrink-0 border-r border-line flex flex-col gap-4 px-6 py-6 min-h-0">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg text-ink-strong truncate">Syllabus</h1>
+          <button
+            type="button"
+            onClick={() => syllabusInput.current?.click()}
+            disabled={syllabusUploading}
+            className="shrink-0 rounded-xl bg-accent-soft text-ink-strong px-3 py-1.5 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syllabusUploading ? "Uploading…" : "Upload"}
+          </button>
+          <input
+            ref={syllabusInput}
+            type="file"
+            accept=".pdf,.docx,.txt"
+            className="hidden"
+            onChange={handleSyllabusFile}
+          />
+        </div>
+
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg text-ink-strong truncate">Materials</h1>
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
             disabled={uploading}
-            className="shrink-0 rounded-xl bg-accent-soft text-ink-strong px-3 py-1.5 text-sm disabled:opacity-50"
+            className="shrink-0 rounded-xl bg-accent-soft text-ink-strong px-3 py-1.5 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploading ? "Uploading…" : "Upload"}
           </button>
@@ -90,9 +135,41 @@ export default function ClassroomView() {
         </div>
       </section>
 
-      {/* Classroom chat */}
-      <div className="grow min-h-0">
-        <ChatArea classroomId={classroomId} />
+      {/* Mode tabs + the active study mode */}
+      <div className="grow min-h-0 flex flex-col">
+        <div
+          role="tablist"
+          aria-label="Study modes"
+          className="shrink-0 flex items-center gap-1 border-b border-line px-4 py-2"
+        >
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={mode === m.id}
+              onClick={() => setMode(m.id)}
+              className={`rounded-xl px-4 py-1.5 text-sm cursor-pointer ${
+                mode === m.id
+                  ? "bg-accent-soft text-ink-strong"
+                  : "text-ink hover:text-ink-strong"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Both modes stay mounted (inactive one hidden) so switching tabs never
+            loses an in-progress quiz attempt or the chat transcript. Each is keyed
+            by classroomId so navigating to another classroom resets its state
+            rather than showing the previous classroom's messages/quiz. */}
+        <div className={mode === "chat" ? "grow min-h-0" : "hidden"}>
+          <ChatArea key={classroomId} classroomId={classroomId} />
+        </div>
+        <div className={mode === "quiz" ? "grow min-h-0" : "hidden"}>
+          <QuizPanel key={classroomId} classroomId={classroomId} />
+        </div>
       </div>
     </div>
   );

@@ -108,6 +108,18 @@ export function uploadMaterial(
   });
 }
 
+export function uploadSyllabus(
+  classroomId: number,
+  file: File
+): Promise<{ syllabus: { filename: string; length: number } }> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch(`/api/classrooms/${classroomId}/syllabus`, {
+    method: "PUT",
+    body: form,
+  });
+}
+
 // Exactly one of these describes where the answer came from.
 export type ChatSourceKind = "materials" | "training" | "web" | "off_topic";
 
@@ -131,4 +143,92 @@ export function sendChat(
     method: "POST",
     body: JSON.stringify({ question, conversationId }),
   });
+}
+
+// ---- Quizzes (M3) ----
+// Quiz URLs use the quiz HEADER id; the server resolves the current version.
+
+export type QuizSummary = {
+  id: number;
+  title: string;
+  topic: string | null;
+  created_at: string;
+  questionCount: number;
+};
+
+export function listQuizzes(classroomId: number): Promise<{ quizzes: QuizSummary[] }> {
+  return apiFetch(`/api/classrooms/${classroomId}/quizzes`);
+}
+
+export function generateQuiz(
+  classroomId: number,
+  topic: string,
+  count: number
+): Promise<{ quizId: number; versionId: number; title: string; questionCount: number }> {
+  return apiFetch(`/api/classrooms/${classroomId}/quizzes`, {
+    method: "POST",
+    body: JSON.stringify({ topic, count }),
+  });
+}
+
+// A question as served during an attempt — the answer key never reaches the client.
+export type AttemptQuestion = {
+  id: number;
+  question_text: string;
+  options: string[];
+};
+
+export function startAttempt(
+  classroomId: number,
+  quizId: number
+): Promise<{ attemptId: number; title?: string; questions: AttemptQuestion[] }> {
+  return apiFetch(`/api/classrooms/${classroomId}/quizzes/${quizId}/attempts`, {
+    method: "POST",
+  });
+}
+
+export type QuizAnswer = { questionId: number; selectedIndex: number };
+
+export function submitAttempt(
+  classroomId: number,
+  quizId: number,
+  attemptId: number,
+  answers: QuizAnswer[]
+): Promise<{ attemptId: number; scoreCorrect: number; scoreTotal: number }> {
+  return apiFetch(
+    `/api/classrooms/${classroomId}/quizzes/${quizId}/attempts/${attemptId}/submit`,
+    { method: "POST", body: JSON.stringify({ answers }) }
+  );
+}
+
+// Which grounding tier the question was generated from (mirrors chat's escalation).
+export type QuizSourceTier = "materials" | "general" | "web";
+
+export type ReviewQuestion = {
+  id: number;
+  question_text: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+  source: QuizSourceTier;
+  selectedIndex: number | null;
+  is_correct: boolean;
+};
+
+export type AttemptReview = {
+  attemptId: number;
+  title?: string;
+  scoreCorrect: number;
+  scoreTotal: number;
+  questions: ReviewQuestion[];
+};
+
+export function getAttemptReview(
+  classroomId: number,
+  quizId: number,
+  attemptId: number
+): Promise<AttemptReview> {
+  return apiFetch(
+    `/api/classrooms/${classroomId}/quizzes/${quizId}/attempts/${attemptId}/review`
+  );
 }

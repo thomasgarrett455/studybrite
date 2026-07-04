@@ -44,6 +44,13 @@ async function extractDocx(input: ExtractInput): Promise<string> {
   return result.value;
 }
 
+async function extractPptx(input: ExtractInput): Promise<string> {
+  const { parseOffice } = await import("officeparser");
+  const ast = await parseOffice(input.buffer);
+  const { value } = await ast.to("md");
+  return value;
+}
+
 export async function extractText(input: ExtractInput): Promise<string> {
   const { mimetype, filename } = input;
   const name = filename.toLowerCase();
@@ -59,6 +66,13 @@ export async function extractText(input: ExtractInput): Promise<string> {
     name.endsWith(".docx")
   ) {
     return extractDocx(input);
+  }
+
+  if (
+    mimetype === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    name.endsWith(".pptx")
+  ) {
+    return extractPptx(input);
   }
 
   // Only decode formats that really ARE plain text — never binary.
