@@ -3,12 +3,16 @@ import { useParams } from "react-router-dom";
 import { getMaterials, uploadMaterial, uploadSyllabus, messageFor, type Material } from "../lib/api";
 import ChatArea from "./ChatArea";
 import QuizPanel from "./QuizPanel";
+import PlanPanel from "./PlanPanel";
+import TeachPanel from "./TeachPanel";
 
-// Study modes available inside a classroom. Quiz is M3; Cards/Plan/Teach slot in here later.
-type Mode = "chat" | "quiz";
+// Study modes available inside a classroom. Quiz is M3, Plan is M4, Teach is M5; Cards slots in here later.
+type Mode = "chat" | "quiz" | "plan" | "teach";
 const MODES: { id: Mode; label: string }[] = [
   { id: "chat", label: "Chat" },
   { id: "quiz", label: "Quiz" },
+  { id: "plan", label: "Plan" },
+  { id: "teach", label: "Teach" },
 ];
 
 // A single classroom: a materials panel on the left (upload + ingested files)
@@ -169,6 +173,12 @@ export default function ClassroomView() {
         </div>
         <div className={mode === "quiz" ? "grow min-h-0" : "hidden"}>
           <QuizPanel key={classroomId} classroomId={classroomId} />
+        </div>
+        <div className={mode === "plan" ? "grow min-h-0" : "hidden"}>
+          <PlanPanel key={classroomId} classroomId={classroomId} />
+        </div>
+        <div className={mode === "teach" ? "grow min-h-0" : "hidden"}>
+          <TeachPanel key={classroomId} classroomId={classroomId} />
         </div>
       </div>
     </div>

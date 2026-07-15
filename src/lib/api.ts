@@ -239,3 +239,147 @@ export function getAttemptReview(
     `/api/classrooms/${classroomId}/quizzes/${quizId}/attempts/${attemptId}/review`
   );
 }
+
+// ---- Study plans (M4) ----
+
+export type PlanPacing = "long_infrequent" | "short_frequent";
+export type PlanRating = "know_it" | "shaky" | "new";
+export type PlanModality = "reading" | "practice" | "video" | "flashcards" | "quiz" | "review";
+
+export type TopicRating = { topic: string; rating: PlanRating };
+
+export type PlanPreferences = {
+  pacing: PlanPacing;
+  modalities: string[];
+  topic_ratings: TopicRating[];
+};
+
+// What the "new plan" form needs: the classroom's current topics (extracted
+// from its materials) and the last plan's preferences to pre-fill the form.
+export function getPlanSetup(
+  classroomId: number
+): Promise<{ topics: string[]; lastPreferences: PlanPreferences | null }> {
+  return apiFetch(`/api/classrooms/${classroomId}/plan-setup`);
+}
+
+export function generatePlan(
+  classroomId: number,
+  input: {
+    deadline: string; // YYYY-MM-DD
+    pacing: PlanPacing;
+    modalities: string[];
+    topicRatings: TopicRating[];
+  }
+): Promise<{ planId: number; title: string }> {
+  return apiFetch(`/api/classrooms/${classroomId}/plans`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type PlanSummary = {
+  id: number;
+  title: string;
+  deadline: string; // YYYY-MM-DD
+  created_at: string;
+  dayCount: number;
+  sessionCount: number;
+};
+
+export function listPlans(classroomId: number): Promise<{ plans: PlanSummary[] }> {
+  return apiFetch(`/api/classrooms/${classroomId}/plans`);
+}
+
+export type PlanSession = {
+  topic: string;
+  activity: string;
+  modality: PlanModality;
+  minutes: number;
+};
+
+export type PlanDay = {
+  date: string; // YYYY-MM-DD
+  focus: string;
+  sessions: PlanSession[];
+};
+
+export type StudyPlan = {
+  id: number;
+  title: string;
+  deadline: string;
+  created_at: string;
+  preferences: PlanPreferences;
+  overview: string;
+  days: PlanDay[];
+};
+
+export function getPlan(classroomId: number, planId: number): Promise<StudyPlan> {
+  return apiFetch(`/api/classrooms/${classroomId}/plans/${planId}`);
+}
+
+// ---- Teach the bot (M5) ----
+
+export type TeachAssessment = {
+  verdict: string;
+  correct: string[];
+  incorrect: string[];
+  missing: string[];
+};
+
+export type TeachMessage = { id: number; sender: "user" | "ai"; text: string };
+
+export type TeachSession = {
+  conversationId: number;
+  topic: string | null;
+  assessedAt: string | null;
+  messages: TeachMessage[];
+  assessment: TeachAssessment | null;
+};
+
+// First message of a session declares the topic; omit conversationId to start one.
+export function sendTeach(
+  classroomId: number,
+  message: string,
+  conversationId?: number
+): Promise<{ conversationId: number; answer: string; topic: string }> {
+  return apiFetch(`/api/classrooms/${classroomId}/teach`, {
+    method: "POST",
+    body: JSON.stringify({ message, conversationId }),
+  });
+}
+
+export function assessTeach(
+  classroomId: number,
+  conversationId: number
+): Promise<{ conversationId: number; assessment: TeachAssessment }> {
+  return apiFetch(`/api/classrooms/${classroomId}/teach/${conversationId}/assess`, {
+    method: "POST",
+  });
+}
+
+export function getLatestTeach(
+  classroomId: number
+): Promise<{ session: TeachSession | null }> {
+  return apiFetch(`/api/classrooms/${classroomId}/teach/latest`);
+}
+
+export type TeachSessionSummary = {
+  conversationId: number;
+  topic: string | null;
+  assessedAt: string | null;
+  updatedAt: string;
+}
+
+export function listTeachSessions(
+  classroomId: number
+) : Promise<{ sessions: TeachSessionSummary[] }> {
+  return apiFetch(`/api/classrooms/${classroomId}/teach/sessions`)
+}
+
+export function getTeachSession(
+  classroomId: number,
+  conversationId: number
+): Promise<{ session: TeachSession }> {
+  return apiFetch(`/api/classrooms/${classroomId}/teach/sessions/${conversationId}`);
+}
+

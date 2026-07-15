@@ -14,6 +14,11 @@ model ai_conversations {
   quiz_context_id      Int?
   note_context_id      Int?
   flashcard_context_id Int?
+  mode                 ai_conversations_mode @default(chat)
+  topic                String?            @db.VarChar(255)
+  summary              String?            @db.Text
+  summarized_up_to     Int?
+  assessed_at          DateTime?          @db.Timestamp(0)
   created_at           DateTime           @default(now()) @db.Timestamp(0)
   updated_at           DateTime           @default(now()) @db.Timestamp(0)
   users                users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ai_conversations_ibfk_1")
@@ -74,6 +79,7 @@ model classrooms {
   flashcard_headers flashcard_headers[]
   note_headers      note_headers[]
   quiz_headers      quiz_headers[]
+  study_plans       study_plans[]
 
   @@index([archived_at], map: "idx_classrooms_archived_at")
   @@index([owner_id], map: "idx_classrooms_owner")
@@ -273,6 +279,25 @@ model quiz_versions {
   @@unique([header_id, version_number], map: "uk_quiz_version")
 }
 
+/// One generated study plan. Flat (no header/version split like quizzes) because
+/// regenerating always creates a brand-new plan; plan_data holds the full schedule.
+model study_plans {
+  id            Int        @id @default(autoincrement())
+  user_id       Int
+  classroom_id  Int
+  title         String     @db.VarChar(255)
+  deadline_date DateTime   @db.Date
+  preferences   Json
+  plan_data     Json
+  created_at    DateTime   @default(now()) @db.Timestamp(0)
+  archived_at   DateTime?  @db.Timestamp(0)
+  users         users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "study_plans_ibfk_1")
+  classrooms    classrooms @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "study_plans_ibfk_2")
+
+  @@index([classroom_id, archived_at], map: "idx_plans_classroom")
+  @@index([user_id, created_at], map: "idx_plans_user")
+}
+
 model users {
   id                       Int                        @id @default(autoincrement())
   name                     String                     @db.VarChar(255)
@@ -290,9 +315,15 @@ model users {
   note_headers             note_headers[]
   quiz_attempts            quiz_attempts[]
   quiz_headers             quiz_headers[]
+  study_plans              study_plans[]
 
   @@index([deleted_at], map: "idx_users_deleted_at")
   @@index([email, deleted_at], map: "idx_users_email_active")
+}
+
+enum ai_conversations_mode {
+  chat
+  teach
 }
 
 enum chat_messages_sender {

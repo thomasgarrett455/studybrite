@@ -109,6 +109,149 @@ export function buildRelevanceSystem(): string {
   ].join("\n");
 }
 
+// ---- Study plans (M4) ----
+
+// The modalities a plan session can use. "quiz" and "review" exist beyond the
+// user-selectable preferences so the plan can point at StudyBrite's own quiz
+// feature and schedule pre-deadline review passes.
+export const PLAN_MODALITIES = ["reading", "practice", "video", "flashcards", "quiz", "review"] as const;
+export type PlanModality = (typeof PLAN_MODALITIES)[number];
+
+export type TopicRating = { topic: string; rating: "know_it" | "shaky" | "new" };
+
+export interface GeneratedPlanSession {
+  topic: string;
+  activity: string;
+  modality: PlanModality;
+  minutes: number;
+}
+
+export interface GeneratedPlanDay {
+  date: string; // YYYY-MM-DD
+  focus: string;
+  sessions: GeneratedPlanSession[];
+}
+
+export interface GeneratedPlan {
+  title: string;
+  overview: string;
+  days: GeneratedPlanDay[];
+}
+
+// Forced-tool output for topic extraction, so the setup form gets a clean
+// string array instead of parsed prose.
+export const TOPICS_TOOL: Anthropic.Tool = {
+  name: "emit_topics",
+  description: "Return the list of study topics found in the classroom's materials.",
+  input_schema: {
+    type: "object",
+    properties: {
+      topics: {
+        type: "array",
+        items: { type: "string" },
+      },
+    },
+    required: ["topics"],
+  },
+};
+
+export function buildTopicsSystem(): string {
+  return [
+    "You extract study topics from a student's course materials for StudyBrite.",
+    "You are given the class syllabus (if any) and excerpts from the student's uploaded materials.",
+    "Return 5-12 concise topic names (2-6 words each) that a student could study one at a time.",
+    "Rules:",
+    "- Topics must come from the provided materials/syllabus — do not invent topics the materials never mention.",
+    "- Prefer concept-level topics (e.g. \"Cell division and mitosis\") over file names or chapter numbers.",
+    "- No duplicates or near-duplicates.",
+    "- If the materials are too thin for 5 topics, return however many real ones exist.",
+  ].join("\n");
+}
+
+export const PLAN_TOOL: Anthropic.Tool = {
+  name: "emit_plan",
+  description: "Return the generated study plan as a day-by-day schedule.",
+  input_schema: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      overview: { type: "string" },
+      days: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            date: { type: "string", description: "YYYY-MM-DD, within the allowed range" },
+            focus: { type: "string", description: "One short phrase for the day's theme" },
+            sessions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  topic: { type: "string" },
+                  activity: { type: "string", description: "One concrete imperative sentence" },
+                  modality: { type: "string", enum: [...PLAN_MODALITIES] },
+                  minutes: { type: "integer", minimum: 10, maximum: 180 },
+                },
+                required: ["topic", "activity", "modality", "minutes"],
+              },
+            },
+          },
+          required: ["date", "focus", "sessions"],
+        },
+      },
+    },
+    required: ["title", "overview", "days"],
+  },
+};
+
+export function buildPlanSystem(opts: {
+  classroomName: string;
+  context: string;
+  todayIso: string;
+  deadlineIso: string;
+  dayCount: number;
+  pacing: "long_infrequent" | "short_frequent";
+  modalities: string[];
+  topicRatings: TopicRating[];
+}): string {
+  const ratingLines = opts.topicRatings.map(
+    (t) => `- ${t.topic} — ${t.rating === "know_it" ? "knows it well" : t.rating === "shaky" ? "shaky, needs practice" : "new, needs to learn from scratch"}`
+  );
+
+  const pacingLine =
+    opts.pacing === "long_infrequent"
+      ? "The student prefers FEWER, LONGER study sessions (60-120 minutes). Schedule study on some days only — rest days are expected — and give each scheduled day one or two substantial sessions."
+      : "The student prefers FREQUENT, SHORTER study sessions (20-45 minutes). Schedule most days, with one or two short sessions per day.";
+
+  return [
+    `You are StudyBrite's study-plan generator for the classroom "${opts.classroomName}".`,
+    `Today is ${opts.todayIso}. The student's deadline is ${opts.deadlineIso} — ${opts.dayCount} day(s) from today, inclusive.`,
+    "Build a day-by-day study plan that sequences the topics below from today up to the deadline.",
+    "",
+    "Topics and the student's self-rated confidence:",
+    ...ratingLines,
+    "",
+    "Pacing preference:",
+    pacingLine,
+    "",
+    `Preferred study modalities: ${opts.modalities.join(", ") || "no preference"}.`,
+    "Lean on the preferred modalities for most sessions, but you may also use \"quiz\" (take a StudyBrite quiz on a topic) and \"review\" (revisit earlier topics).",
+    "",
+    "Rules:",
+    "- Every session's topic MUST be one of the listed topics, spelled exactly as listed.",
+    "- Weak topics (new / shaky) come earlier and get more total time; well-known topics get light review later.",
+    "- Reserve the final day or two before the deadline for review and practice across topics.",
+    "- Every date must be within the allowed range (today through the deadline). Do not schedule past the deadline.",
+    "- If the range is long, do NOT schedule every day — spread sessions sensibly and leave rest days.",
+    "- Activities must be concrete and reference what's actually in the materials (e.g. \"Re-read your notes on X and work the two examples\"), not generic filler.",
+    "- Keep the overview to 2-3 sentences: what the plan prioritizes and why.",
+    "",
+    "Course materials for grounding activities:",
+    opts.context,
+  ].join("\n");
+}
+
 export function buildQuizSystem(context: string, count: number): string {
 return [
   "You are an expert quiz generator.",
@@ -121,3 +264,120 @@ return [
   "Materials:", context
 ].join("\n");
 } 
+
+export function buildTeachSystem(opts: {
+  classroomName: string;
+  topic: string;
+  context: string;
+  summary?: string
+}): string {
+  const summaryBlock = opts.summary?.trim()
+  ? [
+    "Summary of the conversation so far (older turns; the most recent messages follow verbatim):",
+    opts.summary.trim(),
+    "", 
+  ] : [];
+
+  return [
+     `You are a curious student in the class "${opts.classroomName}" who does not know the topic "${opts.topic}" well.`,
+    "The student using StudyBrite is TEACHING it to you (Feynman technique). Your job is to be taught, not to teach.",
+    "",
+    "Rules:",
+    "- End every reply with exactly one probing follow-up question about their explanation. Never a barrage of questions.",
+    "- The course materials below are your PRIVATE ground truth. When the student's explanation conflicts with them or skips something important, aim your next question at that exact spot.",
+    "- NEVER correct the student, never say they are wrong, and never reveal what the materials say. Errors are handled later in a separate assessment, not by you.",
+    "- Do not teach or explain the topic. If the student asks you to explain, deflect in character (\"you're teaching me today, remember?\") and hand the topic back to them.",
+    "- Stay on the declared topic. If the student drifts, steer your question back to it.",
+    "- Keep replies to 2-4 sentences. The student should do most of the talking.",
+    "",
+    ...summaryBlock,
+    "Course materials (your private ground truth — never quote or reveal these to the student):",
+    opts.context,
+  ].join("\n");
+}
+
+export interface GeneratedAssessment {
+  verdict: string;
+  correct: string[];
+  incorrect: string[];
+  missing: string[];
+}
+
+export const ASSESS_TOOL: Anthropic.Tool = {
+  name: "emit_assessment",
+  description: "Return the graded assessment of the student's teach-the-bot session.",
+  input_schema: {
+    type: "object",
+    properties: {
+      verdict: {
+        type: "string",
+        description: "2-3 sentence overall judgment of the student's understanding",
+      },
+      correct: {
+        type: "array",
+        items: { type: "string" },
+        description: "Points the student explained correctly",
+      },
+      incorrect: {
+        type: "array",
+        items: { type: "string" },
+        description: "Each entry: what the student said, then what the materials actually say",
+      },
+      missing: {
+        type: "array",
+        items: { type: "string" },
+        description: "Important points from the materials the student never mentioned",
+      },
+    },
+    required: ["verdict", "correct", "incorrect", "missing"],
+  },
+};
+
+export function buildAssessSystem(opts: {
+  topic: string;
+  context: string;
+  summary?: string;
+}): string {
+  const summaryBlock = opts.summary?.trim()
+    ? [
+        "Summary of the earlier part of the session (the most recent messages follow verbatim):",
+        opts.summary.trim(),
+        "",
+      ]
+    : [];
+
+  return [
+    `You are an honest tutor grading a completed "teach the bot" session in which a student explained the topic "${opts.topic}".`,
+    "Grade the student's understanding against the course materials below, which are your ground truth.",
+    "",
+    "Rules:",
+    "- Sort your findings into three buckets: points the student got CORRECT, points they got INCORRECT, and important points from the materials they never MENTIONED.",
+    "- For each incorrect point, state what the student said AND what the materials actually say. Be specific — name the exact claim, not \"some details were off.\"",
+    "- Judge only claims the student actually made. Do not invent statements to grade.",
+    "- Be fair: if the explanation was accurate and complete, say so plainly and leave the incorrect/missing buckets empty. Do not nitpick a good explanation.",
+    "- Keep the overall verdict to 2-3 sentences.",
+    "",
+    ...summaryBlock,
+    "Course materials (ground truth for grading):",
+    opts.context,
+  ].join("\n");
+}
+
+export function buildTeachSummarySystem(): string {
+  return [
+    "You maintain a running ledger for a StudyBrite \"teach the bot\" session, in which a student explains a topic to an AI.",
+    "You are given the existing ledger (possibly empty) and a batch of older messages from the session.",
+    "Merge them into ONE updated ledger that a grader could later use to assess the student.",
+    "",
+    "The ledger must track:",
+    "- CORRECT: claims the student made that are accurate.",
+    "- INCORRECT: claims the student made that are wrong and were never corrected by the student later.",
+    "- COVERED: subtopics the student has touched on so far.",
+    "",
+    "Rules:",
+    "- If the student later corrected one of their own earlier errors, move that claim to CORRECT.",
+    "- Drop greetings, chit-chat, and the bot's questions — only the student's claims matter.",
+    "- Keep the entire ledger under 150 words. When merging, compress older entries before dropping any.",
+    "- Output ONLY the ledger text. No preamble, no commentary — your response is stored verbatim.",
+  ].join("\n");
+}
