@@ -17,7 +17,7 @@
       },
       {
         "Id": "ec2-backend",
-        "DomainName": "ec2-34-229-211-136.compute-1.amazonaws.com",
+        "DomainName": "ec2-174-129-252-200.compute-1.amazonaws.com",
         "CustomOriginConfig": {
           "HTTPPort": 80,
           "HTTPSPort": 443,
