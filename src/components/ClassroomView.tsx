@@ -5,14 +5,16 @@ import ChatArea from "./ChatArea";
 import QuizPanel from "./QuizPanel";
 import PlanPanel from "./PlanPanel";
 import TeachPanel from "./TeachPanel";
+import DiagramPanel from "./DiagramPanel";
 
 // Study modes available inside a classroom. Quiz is M3, Plan is M4, Teach is M5; Cards slots in here later.
-type Mode = "chat" | "quiz" | "plan" | "teach";
+type Mode = "chat" | "quiz" | "plan" | "teach" | "diagram";
 const MODES: { id: Mode; label: string }[] = [
   { id: "chat", label: "Chat" },
   { id: "quiz", label: "Quiz" },
   { id: "plan", label: "Plan" },
   { id: "teach", label: "Teach" },
+  { id: "diagram", label: "Diagram" },
 ];
 
 // A single classroom: a materials panel on the left (upload + ingested files)
@@ -30,9 +32,16 @@ export default function ClassroomView() {
   const fileInput = useRef<HTMLInputElement>(null);
   const syllabusInput = useRef<HTMLInputElement>(null);
 
+  // Reset loading during render (not in the effect below) when classroomId
+  // changes, so the fetch effect only ever calls setState from its callbacks.
+  const [loadedFor, setLoadedFor] = useState(classroomId);
+  if (classroomId !== loadedFor) {
+    setLoadedFor(classroomId);
+    setLoading(true);
+  }
+
   useEffect(() => {
     let active = true;
-    setLoading(true);
     getMaterials(classroomId)
       .then((res) => active && setMaterials(res.materials))
       .catch((err) => active && setError(messageFor(err)))
@@ -179,6 +188,9 @@ export default function ClassroomView() {
         </div>
         <div className={mode === "teach" ? "grow min-h-0" : "hidden"}>
           <TeachPanel key={classroomId} classroomId={classroomId} />
+        </div>
+        <div className={mode === "diagram" ? "grow min-h-0" : "hidden"}>
+          <DiagramPanel key={classroomId} classroomId={classroomId} />
         </div>
       </div>
     </div>

@@ -381,3 +381,70 @@ export function buildTeachSummarySystem(): string {
     "- Output ONLY the ledger text. No preamble, no commentary — your response is stored verbatim.",
   ].join("\n");
 }
+
+// ---- Diagrams (S3) ----
+
+export type GeneratedDiagramNode = { id: string; label: string };
+export type GeneratedDiagramEdge = { from: string; to: string; label?: string };
+export type GeneratedDiagram = {
+  title: string;
+  nodes: GeneratedDiagramNode[];
+  edges: GeneratedDiagramEdge[];
+};
+
+export const DIAGRAM_TOOL: Anthropic.Tool = {
+  name: "emit_diagram",
+  description: "Return the concept map as nodes and directed, labeled edges.",
+  input_schema: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Short title for the diagram" },
+      nodes: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Short unique key, e.g. 'mitosis'" },
+            label: { type: "string", description: "Concept name shown in the box, 1-6 words" },
+          },
+          required: ["id", "label"],
+        },
+      },
+      edges: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            from: { type: "string", description: "id of the source node" },
+            to: { type: "string", description: "id of the target node" },
+            label: { type: "string", description: "Short relationship phrase, e.g. 'divides into'" },
+          },
+          required: ["from", "to"],
+        },
+      },
+    },
+    required: ["title", "nodes", "edges"],
+  },
+};
+
+export function buildDiagramSystem(opts: {
+  classroomName: string;
+  topic: string;
+  context: string;
+}): string {
+  return [
+    `You are StudyBrite's concept-map generator for the classroom "${opts.classroomName}".`,
+    `Build a concept map of the topic "${opts.topic}" using the course materials below.`,
+    "",
+    "Rules:",
+    "- Nodes are concepts that actually appear in the materials — do not invent concepts the materials never mention.",
+    "- Every edge is a real relationship stated or implied by the materials, with a short label (2-4 words) naming the relationship.",
+    "- 6-15 nodes. Every node must be connected to at least one edge — no orphan boxes.",
+    "- Prefer a hierarchy: the topic itself at the top, sub-concepts branching from it.",
+    "- Labels are short: node labels 1-6 words, edge labels 2-4 words. No punctuation-heavy text.",
+    "- If the materials say too little about the topic to build a real map, use only what is there — a small accurate map beats a large invented one.",
+    "",
+    "Course materials:",
+    opts.context,
+  ].join("\n");
+}

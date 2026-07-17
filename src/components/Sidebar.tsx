@@ -1,12 +1,20 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { NavLink } from "react-router-dom";
-import { useClassrooms } from "../lib/useClassrooms";
 import { getUser } from "../lib/api";
+import type { Classroom } from "../lib/api";
 
-export default function Sidebar() {
+// Classroom state is owned by AppShell (so other pages can refresh it) and
+// passed down here.
+type Props = {
+  classrooms: Classroom[];
+  loading: boolean;
+  error: string | null;
+  create: (name: string) => Promise<Classroom>;
+};
+
+export default function Sidebar({ classrooms, loading, error, create }: Props) {
   const user = getUser();
-  const { classrooms, loading, error, create } = useClassrooms();
 
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");

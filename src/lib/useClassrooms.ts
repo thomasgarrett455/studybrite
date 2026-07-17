@@ -8,8 +8,9 @@ export function useClassrooms() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Silent after the first load: re-fetches swap the list in place instead of
+  // flashing the sidebar back to "Loading…" on every refresh.
   const refresh = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const { classrooms } = await listClassrooms();

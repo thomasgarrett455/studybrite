@@ -234,13 +234,14 @@ async function sessionPayload(conv: {id: number; topic: string | null; assessed_
     });
 
     let assessment: GeneratedAssessment | null = null;
-    const transcript = rows;
+    let transcript = rows;
     const lastRow = rows[rows.length - 1];
     if (conv.assessed_at && lastRow?.sender === "ai") {
         try {
             assessment = JSON.parse(lastRow.message_text) as GeneratedAssessment;
+            transcript = rows.slice(0, -1)
         } catch {
-            return
+            /* not JSON — leave it in the transcript */
         }
     }
 
@@ -394,6 +395,7 @@ router.get("/:id/teach/sessions/:conversationId", async (req, res) => {
     if (!conv) {
         return res.json({ session: await sessionPayload });
     }
+    return res.json({ session: await sessionPayload(conv) })
 });
 
 export default router;

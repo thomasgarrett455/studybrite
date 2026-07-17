@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { randomBytes } from 'crypto';
 import z from 'zod';
 import { prisma } from '../db/prisma.js';
 import requireAuth from '../middleware/requireAuth.js';
+import { generateInviteCode } from '../lib/inviteCode.js';
 
 const router = Router();
 
@@ -14,10 +14,7 @@ const CreateClassroomSchema = z.object({
     name: z.string().trim().min(1, 'Name is required').max(255),
 });
 
-// Generate a short, URL-friendly invite code (e.g. "K7QXM2A9").
-function generateInviteCode() {
-    return randomBytes(6).toString('base64url').slice(0, 8).toUpperCase();
-}
+
 
 // GET /api/classrooms — list the classrooms this user owns (newest first).
 router.get('/', async (req: Request, res: Response) => {

@@ -383,3 +383,70 @@ export function getTeachSession(
   return apiFetch(`/api/classrooms/${classroomId}/teach/sessions/${conversationId}`);
 }
 
+// ---- Diagrams (S3) ----
+
+export type DiagramNode = { id: string; label: string };
+export type DiagramEdge = { from: string; to: string; label?: string };
+
+export type DiagramSummary = {
+  id: number;
+  title: string;
+  topic: string;
+  created_at: string;
+  nodeCount: number;
+};
+
+export type Diagram = {
+  id: number;
+  title: string;
+  topic: string;
+  created_at: string;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+};
+
+export function generateDiagram(
+  classroomId: number,
+  topic: string
+): Promise<{ diagramId: number; title: string }> {
+  return apiFetch(`/api/classrooms/${classroomId}/diagrams`, {
+    method: "POST",
+    body: JSON.stringify({ topic }),
+  });
+}
+
+export function listDiagrams(classroomId: number): Promise<{ diagrams: DiagramSummary[] }> {
+  return apiFetch(`/api/classrooms/${classroomId}/diagrams`);
+}
+
+export function getDiagram(classroomId: number, diagramId: number): Promise<Diagram> {
+  return apiFetch(`/api/classrooms/${classroomId}/diagrams/${diagramId}`);
+}
+
+// ---- Home assistant (S4) ----
+// The home chat is ephemeral: the browser owns the conversation and sends the
+// full history with each request; the server stores nothing.
+
+export type AssistantMessage = { role: "user" | "assistant"; content: string };
+
+export function sendAssistant(
+  messages: AssistantMessage[],
+  files: File[] = []
+): Promise<{ answer: string }> {
+  if (files.length === 0) {
+    return apiFetch("/api/assistant/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages }),
+    });
+  }
+
+  // With attachments the request goes up as multipart form data; apiFetch
+  // already skips the JSON Content-Type header for FormData bodies.
+  const form = new FormData();
+  form.append("messages", JSON.stringify(messages));
+  for (const f of files) form.append("files", f);
+  return apiFetch("/api/assistant/chat", { method: "POST", body: form });
+}
+
+
+

@@ -2,8 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { prisma } from "../db/prisma.js";
 import requireAuth from "../middleware/requireAuth.js";
-import { extractText } from "../lib/extract.js";
-import { ingestText } from "../lib/ingest.js";
+import { ingestMaterial, setSyllabus } from "../lib/materials.js";
 
 const router = Router()
 router.use(requireAuth)
@@ -55,34 +54,19 @@ router.post("/:id/materials", upload.single("file"), async (req, res) => {
     return res.status(404).json({ message: "Classroom not found" })
   }
 
-  const text = await extractText({
+    const material = await ingestMaterial({
+    userId,
+    classroomId,
     buffer: req.file.buffer,
     mimetype: req.file.mimetype,
     filename: req.file.originalname,
   });
-
-  if (!text.trim()) {
-    return res.status(422).json({ message: "Could not extract any text from this file" })
+  if (!material) {
+    return res.status(422).json({ message: "Could not extract any text from this file" });
   }
 
-  const header = await prisma.note_headers.create({
-    data: { user_id: userId, classroom_id: classroomId }
-  });
+  return res.status(200).json({ material });
 
-  const version = await prisma.note_versions.create({
-    data: { header_id: header.id, version_number: 1, title: req.file.originalname, content: text }
-  });
-
-  await prisma.note_headers.update({
-    where: { id: header.id }, 
-    data: { current_version_id: version.id },
-  });
-
-  const chunkCount = await ingestText({ text, classroomId, noteId: header.id });
-
-  return res.status(200).json({
-    material: { id: header.id, title: req.file.originalname, chunks: chunkCount }
-  });
 });
 
 router.put("/:id/syllabus", upload.single("file"), async (req, res) => {
@@ -101,28 +85,17 @@ router.put("/:id/syllabus", upload.single("file"), async (req, res) => {
     return res.status(404).json({ message: "Classroom not found" })
   }
 
-  const text = await extractText({
-    buffer: req.file.buffer, 
+  const syllabus = await setSyllabus({
+    classroomId,
+    buffer: req.file.buffer,
     mimetype: req.file.mimetype,
     filename: req.file.originalname,
   });
-
-  if (!text.trim()) {
-    return res.status(422).json({ message: "Could not extract any text from this file" })
+  if (!syllabus) {
+    return res.status(422).json({ message: "Could not extract any text from this file" });
   }
 
-  await prisma.classrooms.update({
-    where: { id: classroomId },
-    data: {
-      syllabus_text: text,
-      syllabus_filename: req.file.originalname,
-    },
-  });
-
-  return res.status(200).json({
-    syllabus: {filename: req.file.originalname, length: text.length}
-  })
-
+  return res.status(200).json({ syllabus });
 });
 
 export default router;

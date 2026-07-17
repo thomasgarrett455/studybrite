@@ -1,10 +1,19 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import { clearAuth } from "./lib/api";
+import { useClassrooms } from "./lib/useClassrooms";
+
+// What routed pages can reach via useOutletContext — lets the home assistant
+// tell the sidebar to refetch after it creates a classroom.
+export type AppOutletContext = {
+  refreshClassrooms: () => Promise<void>;
+};
 
 // Persistent app frame: sidebar + a main panel that swaps via <Outlet />.
 export default function AppShell() {
   const navigate = useNavigate();
+  // Owned here (not in Sidebar) so routed pages can trigger a refresh.
+  const classroomsState = useClassrooms();
 
   function handleLogout() {
     clearAuth();
@@ -14,7 +23,7 @@ export default function AppShell() {
   return (
     <div className="flex h-screen bg-canvas text-ink">
       <aside className="w-60 border-r border-line shrink-0">
-        <Sidebar />
+        <Sidebar {...classroomsState} />
       </aside>
 
       <main className="grow flex flex-col min-h-0">
@@ -40,7 +49,7 @@ export default function AppShell() {
         </header>
 
         <div className="grow min-h-0">
-          <Outlet />
+          <Outlet context={{ refreshClassrooms: classroomsState.refresh } satisfies AppOutletContext} />
         </div>
       </main>
     </div>

@@ -80,6 +80,8 @@ model classrooms {
   note_headers      note_headers[]
   quiz_headers      quiz_headers[]
   study_plans       study_plans[]
+  diagrams          diagrams[]
+
 
   @@index([archived_at], map: "idx_classrooms_archived_at")
   @@index([owner_id], map: "idx_classrooms_owner")
@@ -316,10 +318,29 @@ model users {
   quiz_attempts            quiz_attempts[]
   quiz_headers             quiz_headers[]
   study_plans              study_plans[]
+  diagrams                 diagrams[]
+
 
   @@index([deleted_at], map: "idx_users_deleted_at")
   @@index([email, deleted_at], map: "idx_users_email_active")
 }
+
+model diagrams {
+  id           Int        @id @default(autoincrement())
+  user_id      Int
+  classroom_id Int
+  topic        String     @db.VarChar(255)
+  title        String     @db.VarChar(255)
+  diagram_data Json
+  created_at   DateTime   @default(now()) @db.Timestamp(0)
+  archived_at  DateTime?  @db.Timestamp(0)
+  users        users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "diagrams_ibfk_1")
+  classrooms   classrooms @relation(fields: [classroom_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "diagrams_ibfk_2")
+
+  @@index([classroom_id, archived_at], map: "idx_diagrams_classroom")
+  @@index([user_id, created_at], map: "idx_diagrams_user")
+}
+
 
 enum ai_conversations_mode {
   chat
