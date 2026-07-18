@@ -6,6 +6,7 @@ import { prisma } from "../db/prisma.js";
 import { generateInviteCode } from "../lib/inviteCode.js";
 import { ownClassroom } from "../lib/classrooms.js";
 import { generateQuizForClassroom } from "../lib/quizGen.js";
+import { generateDiagramForClassroom } from "../lib/diagramGen.js";
 import multer from "multer";
 import { ingestMaterial, setSyllabus } from "../lib/materials.js";
 
@@ -64,6 +65,21 @@ const TOOLS: Anthropic.Tool[] = [
             required: ["classroom_id", "topic"],
         },
 
+    },
+    {
+        name: "generate_diagram",
+        description:
+            "Generate a concept map (diagram) from a classroom's uploaded materials for a topic. " +
+            "Requires the classroom's numeric id — resolve it with list_classrooms first. " +
+            "If the user didn't say what topic the diagram should cover, ask them before calling this.",
+        input_schema: {
+            type: "object",
+            properties: {
+                classroom_id: { type: "number", description: "The classroom's id from list_classrooms" },
+                topic: { type: "string", description: "What the concept map should cover, e.g. 'photosynthesis'" },
+            },
+            required: ["classroom_id", "topic"],
+        },
     },
     {
         name: "ingest_attached_files",
@@ -156,6 +172,39 @@ async function executeTool(
 
         return JSON.stringify({ created: quiz });
     }
+
+    if (name === "generate_diagram") {
+        const classroomId = Number(input?.classroom_id);
+        const topic = String(input?.topic ?? "").trim();
+
+        if (!Number.isInteger(classroomId) || !topic) {
+            return JSON.stringify({ error: "classroom_id and topic are required" });
+        }
+
+        const classroom = await ownClassroom(ctx.userId, classroomId);
+        if (!classroom) {
+            return JSON.stringify({ error: "Classroom not found" });
+        }
+
+        const result = await generateDiagramForClassroom({
+            userId: ctx.userId,
+            classroomId,
+            classroomName: classroom.name,
+            topic,
+            syllabusText: classroom.syllabus_text ?? undefined,
+        });
+        if (!result.ok) {
+            return JSON.stringify({
+                error:
+                    result.reason === "insufficient"
+                        ? "The materials didn't give enough connected concepts for a diagram — try a broader topic."
+                        : "Diagram generation failed",
+            });
+        }
+
+        return JSON.stringify({ created: { diagramId: result.diagramId, title: result.title } });
+    }
+
         if (name === "ingest_attached_files") {
         const classroomId = Number(input?.classroom_id);
         if (!Number.isInteger(classroomId)) {
