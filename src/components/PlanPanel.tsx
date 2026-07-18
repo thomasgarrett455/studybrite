@@ -177,6 +177,7 @@ function PlanSetup({
     () => new Set(["reading", "practice"])
   );
   const [ratings, setRatings] = useState<Map<string, PlanRating>>(new Map());
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
@@ -186,6 +187,9 @@ function PlanSetup({
       .then((res) => {
         if (!active) return;
         setTopics(res.topics);
+        // Every topic starts selected — the user unchecks the ones this plan
+        // shouldn't cover.
+        setSelectedTopics(new Set(res.topics));
         // Every topic starts "shaky"; the last plan's ratings pre-fill any
         // topic that still exists, and pacing/modalities carry over whole.
         const prefs: PlanPreferences | null = res.lastPreferences;
@@ -218,9 +222,20 @@ function PlanSetup({
     });
   }
 
+  function toggleTopic(t: string) {
+    setSelectedTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }
+
   async function handleGenerate(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (generating || !deadline || topics.length === 0) return;
+    // Only the checked topics go into the plan; the rest stay out entirely.
+    const chosen = topics.filter((t) => selectedTopics.has(t));
+    if (generating || !deadline || chosen.length === 0) return;
     setGenerating(true);
     setError(null);
     try {
@@ -228,7 +243,7 @@ function PlanSetup({
         deadline,
         pacing,
         modalities: [...modalities],
-        topicRatings: topics.map((t) => ({ topic: t, rating: ratings.get(t) ?? "shaky" })),
+        topicRatings: chosen.map((t) => ({ topic: t, rating: ratings.get(t) ?? "shaky" })),
       });
       onGenerated(res.planId);
     } catch (err) {
@@ -347,55 +362,75 @@ function PlanSetup({
               </p>
             </section>
 
-            {/* Topic ratings */}
+            {/* Topic selection + ratings */}
             <section className="flex flex-col gap-2">
               <span className="text-sm text-ink-strong">
-                How well do you know each topic?
+                Which topics should this plan cover?
               </span>
               <p className="text-xs text-ink/50 -mt-1">
-                Weak topics get scheduled earlier and get more time.
+                Uncheck anything you don't need. Weak topics get scheduled earlier and get
+                more time.
               </p>
               <ul className="flex flex-col gap-2">
-                {topics.map((t) => (
-                  <li
-                    key={t}
-                    className="rounded-xl border border-ink/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
-                  >
-                    <span className="text-sm text-ink-strong min-w-0">{t}</span>
-                    <div
-                      role="radiogroup"
-                      aria-label={`Confidence for ${t}`}
-                      className="flex rounded-lg border border-line overflow-hidden shrink-0"
+                {topics.map((t) => {
+                  const included = selectedTopics.has(t);
+                  return (
+                    <li
+                      key={t}
+                      className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 flex-wrap ${
+                        included ? "border-ink/10" : "border-ink/5 opacity-50"
+                      }`}
                     >
-                      {(
-                        [
-                          ["new", "New to me"],
-                          ["shaky", "Shaky"],
-                          ["know_it", "Know it"],
-                        ] as const
-                      ).map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          role="radio"
-                          aria-checked={ratings.get(t) === value}
-                          onClick={() =>
-                            setRatings((prev) => new Map(prev).set(t, value))
-                          }
+                      <label className="flex items-center gap-3 min-w-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={included}
+                          onChange={() => toggleTopic(t)}
                           disabled={generating}
-                          className={`px-3 py-1 text-xs cursor-pointer disabled:opacity-50 ${
-                            ratings.get(t) === value
-                              ? "bg-accent-soft text-ink-strong"
-                              : "text-ink/70 hover:text-ink-strong"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </li>
-                ))}
+                          className="size-4 shrink-0 accent-accent cursor-pointer disabled:opacity-50"
+                        />
+                        <span className="text-sm text-ink-strong">{t}</span>
+                      </label>
+                      <div
+                        role="radiogroup"
+                        aria-label={`Confidence for ${t}`}
+                        className="flex rounded-lg border border-line overflow-hidden shrink-0"
+                      >
+                        {(
+                          [
+                            ["new", "New to me"],
+                            ["shaky", "Shaky"],
+                            ["know_it", "Know it"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={ratings.get(t) === value}
+                            onClick={() =>
+                              setRatings((prev) => new Map(prev).set(t, value))
+                            }
+                            disabled={generating || !included}
+                            className={`px-3 py-1 text-xs cursor-pointer disabled:opacity-50 disabled:cursor-default ${
+                              ratings.get(t) === value
+                                ? "bg-accent-soft text-ink-strong"
+                                : "text-ink/70 hover:text-ink-strong"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
+              {selectedTopics.size === 0 && (
+                <p className="text-xs text-red-400">
+                  Select at least one topic to generate a plan.
+                </p>
+              )}
             </section>
 
             {/* Generation takes several seconds of AI time — show what's happening. */}
@@ -410,7 +445,7 @@ function PlanSetup({
 
             <button
               type="submit"
-              disabled={generating || !deadline}
+              disabled={generating || !deadline || selectedTopics.size === 0}
               className="self-start rounded-xl bg-accent text-onyx-50 px-5 py-2 text-sm cursor-pointer hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {generating ? "Generating…" : "Generate plan"}
